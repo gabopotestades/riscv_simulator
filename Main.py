@@ -9,7 +9,7 @@ class Main(tk.Frame):
     def __init__(self, master, regex_lib, test_flag):
         self.master = master
         self.master.title("RISC-V Simulator")
-        self.master.geometry('500x650')
+        self.master.geometry('600x650')
         self.master.config(bg = 'black')
         self.test = test_flag # Boolean for testing outputs
         self.regex_lib = regex_lib
@@ -63,8 +63,7 @@ class Main(tk.Frame):
         string_to_eval = self.edit_text.get("1.0", "end")
         list_of_commands = string_to_eval.splitlines()
 
-        #For testing
-        string_checker = None    
+        #For testing 
         results = []
 
         for command in list_of_commands:
@@ -72,21 +71,25 @@ class Main(tk.Frame):
 
             if formatted_command == '': continue # Skip if empty line
 
+            for pattern in self.regex_lib:
+                match_regex = re.match(pattern, formatted_command)
+                if match_regex: break
+
             if not self.test:
                 results = 'Success!'
-                if not re.match(self.regex_lib, formatted_command):
+                if not match_regex:
                     parsing_passed = False
                     results = 'Fail!'
                     break
                     
             else:          
-                if not re.match(self.regex_lib, formatted_command):
-                    string_checker = 'failed'
-                else:
-                    string_checker = 'passed'
-            
-                output_string = f'[{formatted_command}] : {string_checker}\n'
+                if match_regex:
+                    output_string = f'[{formatted_command}] : {match_regex.groups()}\n'
 
+                else:
+                    output_string = f'[{formatted_command}] : Failed\n'
+
+            
                 results.append(output_string)
 
         if parsing_passed:
@@ -95,14 +98,34 @@ class Main(tk.Frame):
 
 if __name__ == "__main__":
 
+    reserved_words = r'^$'
+
     regex_lib = [
-        r'^#data$',
-        r'^#main$',
-        r'^(lw)[\s *]()$'
+        # reserved word
+        r'^.(data)$',
+        # reserved word
+        r'^.(text)$',
+        # variable declaration
+        r'^([a-z_][\w]*)[\s]*:[\s]*(.word)[\s]+([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$',
+        # jump declaration
+        r'^([a-z_][\w]*)[\s]*:$', 
+        # load / store
+        r'^(lw|sw)[\s]+x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0?[1-9]|[12][0-9]|3[01])\)$',
+        # integer computation
+        r'^(add|slt|sll|srl|and|or|xor)[\s]+x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0?[1-9]|[12][0-9]|3[01])$', 
+        # integer computation (immediate)
+        r'^(addi|slti|slli|srli|andi|ori|xori)[\s]+x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$'
+        # control transfer (branching)
+        r'^(beq|bnq|blt|bge)[\s]+x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$'
     ]
-    
-    regex_lib = '(' + ')|('.join(regex_lib) + ')'
 
     root = tk.Tk()
     app = Main(root, regex_lib, True)
     root.mainloop()
+
+
+    # Test data
+    # .data
+    # .main
+    # lw x3,  0(x3)
+    # add x4, x6, x3

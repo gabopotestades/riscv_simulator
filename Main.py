@@ -8,7 +8,7 @@ import pandas as pd
 class Main(tk.Frame):
 
     # Initialize the screen
-    def __init__(self, master, taxonomy_dict, types_dict, test_flag):
+    def __init__(self, master, taxonomy_dict, test_flag):
         self.master = master
         self.master.title("RISC-V Simulator")
         self.master.geometry('600x650')
@@ -16,7 +16,6 @@ class Main(tk.Frame):
         self.test = test_flag # Boolean for testing outputs
         self.edit_text = None
         self.terminal_text = None
-        self.opcode_legend_dict = types_dict
         self.taxonomy_dict = taxonomy_dict
         self.binary_table_df = pd.DataFrame(columns=['instruction', '32-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
         self.create_widgets()
@@ -35,6 +34,7 @@ class Main(tk.Frame):
         self.edit_text.pack(fill="x")
 
         sample_input = """add x12, x13, x3
+slti x12, x13, 0x31
 """
 # .data
 # var_1       :     .word 0x11213
@@ -81,7 +81,7 @@ class Main(tk.Frame):
     def parse_instruction(self, instruction, matched_string):
         def r_type():
             # op code
-            six_to_zero = 0b0110011
+            six_to_zero = 51
             # rd
             eleven_to_seven = matched_string[0]
             # funct3
@@ -104,18 +104,55 @@ class Main(tk.Frame):
 
             return row_to_return
 
-        # def i_type():
-        #
-        # for key, taxonomy in self.taxonomy_dict.items():
-        #     match_regex = re.match(taxonomy['regex'], formatted_instruction)
-        #
-        #     type = taxonomy['type']
+        def i_type():
+            # op code
+            six_to_zero = 19
+            # rd
+            eleven_to_seven = matched_string[0]
+            # funct3
+            fourteen_to_twelve = taxonomy_details['14-12']
+            # rs1
+            nineteen_to_fifteen = matched_string[1]
 
+            # immediate
+            thirtytwo_to_twenty = matched_string[2]
 
+            # parse hex (there should be another rule for non hex
+            thirtytwo_to_twenty = bin(int(thirtytwo_to_twenty, 16))
 
-        taxonomy_details = taxonomy_dict[instruction]
+            # pad to 12 bits
+            thirtytwo_to_twenty = thirtytwo_to_twenty[2:].zfill(12)
+            print(f"hex received: {thirtytwo_to_twenty} in int: {int(thirtytwo_to_twenty, 16)} in raw: {matched_string[2]}")
 
-        row_to_return = r_type()
+            # convert to binary
+            twentyfour_to_twenty = bin(int(f"0b{thirtytwo_to_twenty[6:12]}", 2))
+            thirtytwo_to_twentyfive = bin(int(f"0b{thirtytwo_to_twenty[0:5]}", 2))
+
+            # convert to integer
+            twentyfour_to_twenty = int(twentyfour_to_twenty, 2)
+            thirtytwo_to_twentyfive = int(thirtytwo_to_twentyfive, 2)
+
+            print(f"first: {twentyfour_to_twenty}, second: {thirtytwo_to_twentyfive}")
+
+            row_to_return = {
+                '32-25': thirtytwo_to_twentyfive,
+                '24-20': twentyfour_to_twenty,
+                '19-15': nineteen_to_fifteen,
+                '14-12': fourteen_to_twelve,
+                '11-7': eleven_to_seven,
+                '6-0': six_to_zero
+            }
+
+            return row_to_return
+
+            bin(0b001000)
+
+        taxonomy_details = self.taxonomy_dict[instruction]
+
+        if taxonomy_details['type'] == 'r-type':
+            row_to_return = r_type()
+        elif taxonomy_details['type'] == 'i-type':
+            row_to_return = i_type()
 
         # Cast to binary
         row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()}
@@ -123,6 +160,7 @@ class Main(tk.Frame):
         row_to_return['instruction'] = instruction
 
         return row_to_return
+
 
 
 
@@ -140,62 +178,23 @@ class Main(tk.Frame):
 
 
         for command in list_of_commands:
-        # for key, value in a_dict.items():
             formatted_command = command.lower().strip()
 
             if formatted_command == '': continue # Skip if empty line
 
+
+            print(f"Command to marge regex: {command}")
             for key, taxonomy in taxonomy_dict.items():
-                print(taxonomy['regex'])
                 match_regex = re.match(taxonomy['regex'], formatted_command)
 
-                print(match_regex.groups())
-                type = taxonomy['type']
-
-                row_to_add = self.parse_instruction(key, match_regex.groups())
-
-                # type_details = types_dict[type]
-                #
-                # # opcode / static for all types
-                # six_to_zero = type_details['6-0']
-                #
-                # if type in ['r-type', 'i-type']:
-                #     # rd
-                #     eleven_to_seven_details = type_details["11-7"]
-                #     eleven_to_seven = bin(int(match_regex[eleven_to_seven_details['regex_index']]))[2:].zfill(4)
-                #
-                #     # rs1
-                #     nineteen_to_fifteen = bin(int(match_regex[type_details["19-15"]]))[2:].zfill(5)
-                #     if type == 'r-type':
-                #         # rs2
-                #         twentyfour_to_twenty = bin(int(match_regex[type_details["24-20"]]))[2:].zfill(4)
-                #         thirtytwo_to_twentyfive = bin(taxonomy['32-25'])[2:].zfill(8)
-                #         print("rs2")
-                #
-                #     if type == 'i-type':
-                #         # immediate
-                #         thirtytwo_to_twenty = bin(int(match_regex[type_details["32-20"]]))[2:].zfill(12)
-                #         twentyfour_to_twenty = thirtytwo_to_twenty[5:12]
-                #         thirtytwo_to_twentyfive = thirtytwo_to_twenty[0:5]
-                #
-                #
-                # fourteen_to_twelve = bin(taxonomy['14-12'])[2:].zfill(8)
-                #
-                #
-                # row_to_add = {
-                #     'command': key,
-                #     '32-25': thirtytwo_to_twentyfive,
-                #     '24-20': twentyfour_to_twenty,
-                #     '19-15': nineteen_to_fifteen,
-                #     '14-12': fourteen_to_twelve,
-                #     '11-7': eleven_to_seven,
-                #     '6-0': six_to_zero
-                # }
+                if match_regex:
+                    row_to_add = self.parse_instruction(key, match_regex.groups())
+                    self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
 
 
+                print("Row to add")
                 print(row_to_add)
 
-                self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
                 if match_regex: break
 
 
@@ -257,39 +256,6 @@ if __name__ == "__main__":
     regex_integer_computation_immediate = "[\s]+x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$"
 
 
-    types_dict = {
-        # 'i-type': 0b0010011, #immediate
-        'r-type': {
-            "6-0": 0b0110011,
-            "11-7": {
-                "regex_index": 0,
-            },
-            '19-15': {
-                "regex_index": 1,
-            },
-            '24-20': {
-                "regex_index": 2,
-            },
-        },
-        # immediate
-        'i-type': {
-            "6-0": 0b0010011,
-            "11-7": {
-                "regex_index": 0,
-            },
-            '19-15': {
-                "regex_index": 1,
-            },
-            '32-20': {
-                "regex_index": 2,
-            }
-        }
-        # 's-type': 0b0100011, #store
-        # 'b-type': 0b1100011, #branch
-        # 'j-type': 0b1101111, #jump
-    }
-
-
     taxonomy_dict = {
         "add": {
             "regex": f"^add{regex_integer_computation}",
@@ -297,8 +263,8 @@ if __name__ == "__main__":
             '14-12': 0b000,
             '32-25': 0b000000
         },
-        "addi": {
-            "regex": f"^addi{regex_integer_computation_immediate}",
+        "slti": {
+            "regex": f"^slti{regex_integer_computation_immediate}",
             "type": 'i-type',
             '14-12': 0b000
         }
@@ -306,7 +272,7 @@ if __name__ == "__main__":
 
 
     root = tk.Tk()
-    app = Main(root, taxonomy_dict, types_dict, True)
+    app = Main(root, taxonomy_dict, True)
     root.mainloop()
 
 
@@ -315,3 +281,5 @@ if __name__ == "__main__":
     # .main
     # lw x3,  0(x3)
     # add x4, x6, x3
+
+int('0x8', 16)

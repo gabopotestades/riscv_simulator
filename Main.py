@@ -86,12 +86,12 @@ class Main(tk.Frame):
 # """
 
         # Sample input for sb-type
-#         sample_input = """.text
-# beq x0, x02, jumper
-#  bne x0, x02, _test
-#  blt x31, x11, _12312
-#  bge x12, x22, a23524
-#  """
+        sample_input = """.text
+beq x0, x02, jumper
+ bne x0, x02, _test
+ blt x31, x11, _12312
+ bge x12, x22, a23524
+ """
 
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")

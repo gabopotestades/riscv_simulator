@@ -14,10 +14,22 @@ class Main(tk.Frame):
         self.master.geometry('600x650')
         self.master.config(bg = 'black')
         self.test = test_flag # Boolean for testing outputs
+        self.is_data = False
+        self.is_text = False
+        self.line_counter = 1
+
         self.edit_text = None
         self.terminal_text = None
+
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
+
+        self.variables = None
+        self.jump_instructions = None
+
+        self.current_data_segment = None
+        self.current_instruction_address = None
+
         self.binary_table_df = None
         self.create_widgets()
 
@@ -34,18 +46,31 @@ class Main(tk.Frame):
         self.edit_text = Text(self.master, background="black", foreground="white", insertbackground='white', height=30)
         self.edit_text.pack(fill="x")
 
-        # Sample input for r-type
-        sample_input = """add x0, x1, x2
-and x3, x4, x5
-or x6, x7, x8
-xor x9, x10, x11
-slt x12, x13, x14
-srl x15, x16, x17
-sll x18, x19, x20
+        # Sample input for reserved words
+        sample_input = """.data
+var1: .word 0x024235
+var2: .word 4325435
+var3: .word 23432
+
+.text
+jump:
+
 """
 
+        # Sample input for r-type
+#         sample_input = """.text
+# add x0, x1, x2
+# and x3, x4, x5
+# or x6, x7, x8
+# xor x9, x10, x11
+# slt x12, x13, x14
+# srl x15, x16, x17
+# sll x18, x19, x20
+# """
+
         # Sample input for i-type
-#         sample_input = """addi x0, x1, 0x2
+#         sample_input = """.text
+# addi x0, x1, 0x2
 # slti x3, x4, 0x5
 # slli x6, x7, 2323
 # srli x9, x10, 34543
@@ -55,28 +80,19 @@ sll x18, x19, x20
 # """
 
 # Sample input for s-type
-#         sample_input = """sw x0, (x02)
+#         sample_input = """.text
+# sw x0, (x02)
 # sw x0, 0(x12)
 # lw x2, 3(x31)
 # """
 
        # Sample input for sb-type
-#         sample_input = """beq x0, x02, jumper
+#         sample_input = """.text
+# beq x0, x02, jumper
 #  bne x0, x02, _test
 #  blt x31, x11, _12312
 #  bge x12, x22, a23524
 #  """
-
-# .data
-# var_1       :     .word 0x11213
-# var_2       :     .word 876
-# var_2       :     .word -876
-# .text
-# lw x12, 0(x12)
-# addi x12, x13, 0x8
-# addi x12, x13, 1231
-# bge x1, x2, jump1
-# jump1:
 
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")
@@ -119,6 +135,7 @@ sll x18, x19, x20
             self.terminal_text.see("end")
             self.terminal_text.config(state="disabled")
 
+    # Get return row on parsing of matched line
     def parse_instruction(self, instruction, matched_string, is_command):
 
         if is_command:
@@ -258,92 +275,149 @@ sll x18, x19, x20
             row_to_return['instruction'] = instruction
 
             return row_to_return
-        
+
         elif not is_command:
 
-            pass
+            if instruction == 'variable':
 
+                # Get value of variable
+                var_name = matched_string[0]
+                value = matched_string[2]
+
+                self.variables[var_name] = {}
+
+                if value[0:2] == '0x':
+                    value = bin(int(value, 16))
+                else:
+                    value = bin(int(value))
+
+                # Get current address to place variable
+                address = self.current_data_segment
+                self.current_data_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+
+                self.variables[matched_string[0]]['value'] = value
+                self.variables[matched_string[0]]['address'] = address
+
+            elif instruction == 'data':
+                self.is_data = True
+                self.is_text = False
+            elif instruction == 'text':
+                self.is_data = False
+                self.is_text = True
+            elif instruction == 'jump':
+                pass
 
     # Gets the string from the edit text box
-    def evaluate(self):
-        parsing_passed = True
+    def evaluate(self): 
 
+        #Get lines from text field
         string_to_eval = self.edit_text.get("1.0", "end")
         list_of_commands = string_to_eval.splitlines()
+
+        # Reset all parameters
+        parsing_passed = True
+        self.line_counter = 1
+        self.is_data = False
+        self.is_text = True
+
+        self.variables = {}
+        self.jump_instructions = {}
+        self.current_data_segment = '11111111111' # 0x000007ff in binary
+        self.current_instruction_address = '10000000000000001111111111111' # 0x10001fff in binary
         self.binary_table_df = pd.DataFrame(columns=['instruction', '31-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
 
         #For testing
         results = []
 
         for command in list_of_commands:
+            msg = ""
             match_found = False
             formatted_command = command.lower().strip()
 
-            if formatted_command == '': continue # Skip if empty line
+            if formatted_command == '': # Skip if empty line
+                self.line_counter += 1
+                continue 
 
             # print(f"Command to match regex: {command}")
             for key, command in self.commands_dict.items():
                 match_regex = re.match(command['regex'], formatted_command)
 
                 if match_regex:
-                    row_to_add = self.parse_instruction(key, match_regex.groups(), True)
-                    self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
-                    match_found = True
+                    
+                    if self.is_text:
+                        row_to_add = self.parse_instruction(key, match_regex.groups(), True)
+                        self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
+                        msg = match_regex.groups()
+                    else:
+                        msg = f"No '.text' reserved word found before line {self.line_counter}."
                     # print("Row to add")
                     # print(row_to_add)
+                    match_found = True
                     break
 
             if not match_found:
                 
-                for regex in reserved_list:
+                for key, regex in reserved_list.items():
                     match_regex = re.match(regex, formatted_command)
 
                     if match_regex:
-                        row_to_add = self.parse_instruction(match_regex[0], match_regex.groups(), False)
+
+                        if key == 'jump':
+                            if self.is_text:
+                                row_to_add = self.parse_instruction(key, match_regex.groups(), False)
+                                msg = match_regex.groups()
+                            else:
+                                msg = f"No '.text' reserved word found before line {self.line_counter}."
+
+                        elif key in ['data', 'text'] or self.is_data:
+                            row_to_add = self.parse_instruction(key, match_regex.groups(), False)
+                            msg = match_regex.groups()
+
+                        else:
+                            msg = f"No '.data' reserved word found before line {self.line_counter}."
+
                         break
             
             if not self.test:
                 results = 'Success!'
                 if not match_regex:
                     parsing_passed = False
-                    results = 'Fail!'
+                    results = msg
                     break
             else:
-                if match_regex:
-                    output_string = f'[{formatted_command}] : {match_regex.groups()}\n'
-                    # print(match_regex.groups())
+                # output_string = f'[{formatted_command}] : {match_regex.groups()}\n'
 
-                else:
-                    output_string = f'[{formatted_command}] : Failed\n'
+                if not match_regex:
+                    msg = f'Incorrect syntax at line {self.line_counter}!'
+
+                output_string = f'[{formatted_command}] : {msg}\n'
 
                 results.append(output_string)
+
+            self.line_counter += 1
 
         if parsing_passed:
             self.print_in_terminal(results)
             # print(self.binary_table_df)
+            print(self.variables)
             self.print_formatted_table()
-
 
 
 if __name__ == "__main__":
 
-    reserved_words = r'^$'
-
-    # register = [<regex>]
-
     # Bawal to, check if it passes
     # add x6, x6, x8
 
-    reserved_list = [
+    reserved_list = {
         # reserved word
-        r'^.(data)$',
+        "data": r'^.(data)$',
         # reserved word
-        r'^.(text)$',
-        # variable declaration
-        r'^([a-z_][\w]*)[\s]*:[\s]*(.word)[\s]+([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$',
+        "text": r'^.(text)$',
+        # variable d/eclaration
+        "variable": r'^([a-z_][\w]*)[\s]*:[\s]*(.word)[\s]+([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$',
         # jump declaration
-        r'^([a-z_][\w]*)[\s]*:$'
-    ]
+        "jump": r'^([a-z_][\w]*)[\s]*:$'
+    }
 
     regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
@@ -466,14 +540,6 @@ if __name__ == "__main__":
         }
     }
 
-
     root = tk.Tk()
     app = Main(root, commands_dict, reserved_list, True)
     root.mainloop()
-
-
-    # Test data
-    # .data
-    # .main
-    # lw x3,  0(x3)
-    # add x4, x6, x3

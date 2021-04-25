@@ -92,14 +92,13 @@ var2: .word 2
 var3: .word 0x08
 .text
 jumper:
+lw x6, 0(x8)
 beq x0, x02, jumper
-bne x0, x02, _test
-blt x31, x11, _12312
-bge x12, x22, a23524
 .data
 var4: .word 33
 .text
 add x3, x4, x7
+slti x3, x4, 0x5
  """
 
         self.edit_text.insert(1.0, sample_input)
@@ -148,6 +147,7 @@ add x3, x4, x7
     # Get return row on parsing of matched line
     def parse_instruction(self, instruction, matched_string, is_command):
 
+        # If is_command is True, convert the command to opcode
         if is_command:
 
             def r_type():
@@ -256,18 +256,55 @@ add x3, x4, x7
                 return row_to_return
 
             def sb_type():
+
+                jump_inst = matched_string[3]
+
+                # If jump instruction already in lookup, get the immediate
+                if jump_inst in self.jump_instructions.keys():
+
+                    # Offset = jump instruction address - current address divided by 2
+                    immediate = (int(self.jump_instructions[jump_inst], 2) - int(self.current_text_segment, 2)) // 2
+
+                    original_binary = bin(immediate & 0xfff)[2:]
+                    immediate = bin(immediate & 0xfff)[2:][::-1] #for two's complement
+
+                    # Get the 4 parts of the immediate value
+                    imm_12 = immediate[11]
+                    imm_10_5 = immediate[5:10][::-1]
+                    imm_4_1 = immediate[0:5][::-1]
+                    imm_11 = immediate[10]
+
+
+                    # For checking if slicing of binary value is correct
+                    
+                    # print(f'Original: {original_binary}')
+                    # print(f'Reversed: {immediate}')
+                    # print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
+                    # checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
+                    # print(f'Checking: {checking_result}')
+
+                    # rd
+                    eleven_to_seven = int(imm_4_1 + imm_11, 2)
+                    # funct7
+                    thirtyone_to_twentyfive = int(imm_12 + imm_10_5, 2)
+
+                else:
+
+                    # Dito yung kailangan word yung wala pang jump instruction sa look up
+
+                    # rd
+                    eleven_to_seven = 0
+                    # funct7
+                    thirtyone_to_twentyfive = 0
+
                 # op code
                 six_to_zero = 63
-                # rd
-                eleven_to_seven = 0
                 # funct3
                 fourteen_to_twelve = taxonomy_details['14-12']
                 # rs1
                 nineteen_to_fifteen = matched_string[1]
                 # rs2
                 twentyfour_to_twenty = matched_string[2]
-                # funct7
-                thirtyone_to_twentyfive = 0
 
                 row_to_return = {
                     '31-25': thirtyone_to_twentyfive,
@@ -302,6 +339,7 @@ add x3, x4, x7
 
             return row_to_return
 
+        # If is_command is False, handle special cases depending of instruction type
         elif not is_command:
 
             # Returns boolean if variable was added
@@ -318,19 +356,22 @@ add x3, x4, x7
 
                 # Get current address to place variable
                 address = self.current_data_segment
-                self.current_data_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+                self.current_data_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
 
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address
 
                 return True
 
+            #Toggle the mode of the edit text field
             elif instruction == 'data':
                 self.is_data = True
                 self.is_text = False
             elif instruction == 'text':
                 self.is_data = False
                 self.is_text = True
+
+            #Returns false if jump instrution already in the table
             elif instruction == 'jump':
                 
                 jump_inst = matched_string[0]
@@ -353,7 +394,7 @@ add x3, x4, x7
                 row_to_return['address'] = address
                 row_to_return['instruction'] = jump_inst
 
-                self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+                self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
                 
                 return row_to_return
 
@@ -405,8 +446,10 @@ add x3, x4, x7
                     match_found = True
                     break
 
+            # If no commands matched, check if it's a reserved word command
             if not match_found:
                 
+                # Key is the regex type
                 for key, regex in reserved_list.items():
                     match_regex = re.match(regex, formatted_command)
 
@@ -435,9 +478,9 @@ add x3, x4, x7
                                 else:
                                     msg = f"Line: {self.line_counter}, Error: Variable '{match_regex[1]}' is already defined."
                             else:
-                                msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
+                                msg = f"Line: {self.line_counter}, Error: No '.data' reserved word found before this instruction."
                         break
-            
+
             if not self.test:
                 results = 'Success!'
                 if not match_regex:
@@ -458,7 +501,6 @@ add x3, x4, x7
 
         if parsing_passed:
             self.print_in_terminal(results)
-            # print(self.binary_table_df)
             print('==========================================')
             print('Jump Instructions:')
             print(self.jump_instructions)

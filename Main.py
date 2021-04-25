@@ -28,7 +28,7 @@ class Main(tk.Frame):
         self.jump_instructions = None
 
         self.current_data_segment = None
-        self.current_instruction_address = None
+        self.current_text_segment = None
 
         self.binary_table_df = None
         self.create_widgets()
@@ -86,11 +86,20 @@ class Main(tk.Frame):
 # """
 
         # Sample input for sb-type
-        sample_input = """.text
+        sample_input = """.data
+var1: .word 0x0f
+var2: .word 2
+var3: .word 0x08
+.text
+jumper:
 beq x0, x02, jumper
- bne x0, x02, _test
- blt x31, x11, _12312
- bge x12, x22, a23524
+bne x0, x02, _test
+blt x31, x11, _12312
+bge x12, x22, a23524
+.data
+var4: .word 33
+.text
+add x3, x4, x7
  """
 
         self.edit_text.insert(1.0, sample_input)
@@ -106,13 +115,15 @@ beq x0, x02, jumper
     
     # Pad binary digits
     def print_formatted_table(self):
-        self.binary_table_df['31-25'] = self.binary_table_df['31-25'].apply(lambda x: x[2:].zfill(7)[::-1][0:8][::-1])
-        self.binary_table_df['24-20'] = self.binary_table_df['24-20'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
-        self.binary_table_df['19-15'] = self.binary_table_df['19-15'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
-        self.binary_table_df['14-12'] = self.binary_table_df['14-12'].apply(lambda x: x[2:].zfill(3)[::-1][0:3][::-1])
-        self.binary_table_df['11-7'] = self.binary_table_df['11-7'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
-        self.binary_table_df['6-0'] = self.binary_table_df['6-0'].apply(lambda x: x[2:].zfill(7)[::-1][0:7][::-1])
-        print(self.binary_table_df)
+        print_df = self.binary_table_df.copy()
+        print_df['address'] = print_df['address'].apply(lambda x: x[2:].zfill(32))
+        print_df['31-25']   = print_df['31-25'].apply(lambda x: x[2:].zfill(7)[::-1][0:8][::-1])
+        print_df['24-20']   = print_df['24-20'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
+        print_df['19-15']   = print_df['19-15'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
+        print_df['14-12']   = print_df['14-12'].apply(lambda x: x[2:].zfill(3)[::-1][0:3][::-1])
+        print_df['11-7']    = print_df['11-7'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
+        print_df['6-0']     = print_df['6-0'].apply(lambda x: x[2:].zfill(7)[::-1][0:7][::-1])
+        print(print_df)
 
     # Outputs to terminal the processed data
     def print_in_terminal(self, inputStr):
@@ -283,7 +294,11 @@ beq x0, x02, jumper
             # Cast to binary
             row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()}
 
+            address = self.current_text_segment
+            row_to_return['address'] = address
             row_to_return['instruction'] = instruction
+
+            self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
             return row_to_return
 
@@ -317,7 +332,30 @@ beq x0, x02, jumper
                 self.is_data = False
                 self.is_text = True
             elif instruction == 'jump':
-                pass
+                
+                jump_inst = matched_string[0]
+
+                if jump_inst in self.jump_instructions.keys(): return False
+
+                row_to_return = {
+                    '31-25': '0b0',
+                    '24-20': '0b0',
+                    '19-15': '0b0',
+                    '14-12': '0b0',
+                    '11-7': '0b0',
+                    '6-0': '0b0'
+                }
+
+                address = self.current_text_segment
+                
+                self.jump_instructions[jump_inst] = address
+
+                row_to_return['address'] = address
+                row_to_return['instruction'] = jump_inst
+
+                self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+                
+                return row_to_return
 
     # Gets the string from the edit text box
     def evaluate(self): 
@@ -334,9 +372,9 @@ beq x0, x02, jumper
 
         self.variables = {}
         self.jump_instructions = {}
-        self.current_data_segment = '0b11111111111' # 0x000007ff in binary
-        self.current_instruction_address = '0b10000000000000001111111111111' # 0x10001fff in binary
-        self.binary_table_df = pd.DataFrame(columns=['instruction', '31-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
+        self.current_data_segment = '0b00000000000000000000011111111111' # 0x000007ff in binary
+        self.current_text_segment = '0b00010000000000000001111111111111' # 0x10001fff in binary
+        self.binary_table_df = pd.DataFrame(columns=['address', 'instruction', '31-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
 
         #For testing
         results = []
@@ -376,8 +414,12 @@ beq x0, x02, jumper
 
                         if key == 'jump':
                             if self.is_text:
-                                row_to_add = self.parse_instruction(key, match_regex.groups(), False)
-                                msg = match_regex.groups()
+                                result = self.parse_instruction(key, match_regex.groups(), False)
+                                if result:
+                                    self.binary_table_df = self.binary_table_df.append(result, ignore_index=True)
+                                    msg = match_regex.groups()
+                                else:
+                                    msg = f"Line: {self.line_counter}, Error: Instruction '{match_regex[1]}' is already defined."
                             else:
                                 msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
 
@@ -404,7 +446,6 @@ beq x0, x02, jumper
                     results = msg
                     break
             else:
-                # output_string = f'[{formatted_command}] : {match_regex.groups()}\n'
 
                 if not match_regex:
                     msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
@@ -418,6 +459,9 @@ beq x0, x02, jumper
         if parsing_passed:
             self.print_in_terminal(results)
             # print(self.binary_table_df)
+            print('==========================================')
+            print('Jump Instructions:')
+            print(self.jump_instructions)
             print('==========================================')
             print('Declared Variables:')
             print(self.variables)

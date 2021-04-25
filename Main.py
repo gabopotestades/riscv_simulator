@@ -298,8 +298,8 @@ jump:
                 address = self.current_data_segment
                 self.current_data_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
-                self.variables[matched_string[0]]['value'] = value
-                self.variables[matched_string[0]]['address'] = address
+                self.variables[var_name]['value'] = value
+                self.variables[var_name]['address'] = address
 
                 return True
 

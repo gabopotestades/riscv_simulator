@@ -278,11 +278,14 @@ jump:
 
         elif not is_command:
 
+            # Returns boolean if variable was added
             if instruction == 'variable':
 
                 # Get value of variable
                 var_name = matched_string[0]
                 value = matched_string[2]
+
+                if var_name in self.variables.keys(): return False
 
                 self.variables[var_name] = {}
 
@@ -297,6 +300,8 @@ jump:
 
                 self.variables[matched_string[0]]['value'] = value
                 self.variables[matched_string[0]]['address'] = address
+
+                return True
 
             elif instruction == 'data':
                 self.is_data = True
@@ -349,7 +354,7 @@ jump:
                         self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
                         msg = match_regex.groups()
                     else:
-                        msg = f"No '.text' reserved word found before line {self.line_counter}."
+                        msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
                     # print("Row to add")
                     # print(row_to_add)
                     match_found = True
@@ -367,20 +372,27 @@ jump:
                                 row_to_add = self.parse_instruction(key, match_regex.groups(), False)
                                 msg = match_regex.groups()
                             else:
-                                msg = f"No '.text' reserved word found before line {self.line_counter}."
+                                msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
 
-                        elif key in ['data', 'text'] or self.is_data:
+                        elif key in ['data', 'text']:
                             row_to_add = self.parse_instruction(key, match_regex.groups(), False)
                             msg = match_regex.groups()
-
-                        else:
-                            msg = f"No '.data' reserved word found before line {self.line_counter}."
-
+                        
+                        elif key == 'variable':
+                            if self.is_data:
+                                result = self.parse_instruction(key, match_regex.groups(), False)
+                                if result:
+                                    msg = match_regex.groups()
+                                else:
+                                    msg = f"Line: {self.line_counter}, Error: Variable '{match_regex[1]}' is already defined."
+                            else:
+                                msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
                         break
             
             if not self.test:
                 results = 'Success!'
                 if not match_regex:
+                    msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
                     parsing_passed = False
                     results = msg
                     break
@@ -388,7 +400,7 @@ jump:
                 # output_string = f'[{formatted_command}] : {match_regex.groups()}\n'
 
                 if not match_regex:
-                    msg = f'Incorrect syntax at line {self.line_counter}!'
+                    msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
 
                 output_string = f'[{formatted_command}] : {msg}\n'
 
@@ -399,8 +411,13 @@ jump:
         if parsing_passed:
             self.print_in_terminal(results)
             # print(self.binary_table_df)
+            print('==========================================')
+            print('Declared Variables:')
             print(self.variables)
+            print('==========================================')
+            print('Opcodes:')
             self.print_formatted_table()
+            print('==========================================')
 
 
 if __name__ == "__main__":

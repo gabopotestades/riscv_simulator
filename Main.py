@@ -47,15 +47,15 @@ class Main(tk.Frame):
         self.edit_text.pack(fill="x")
 
         # Sample input for reserved words
-        sample_input = """.data
-var1: .word 0x024235
-var2: .word 4325435
-var3: .word 23432
+#         sample_input = """.data
+# var1: .word 0x0f
+# var2: .word 2
+# var3: .word 0x08
 
-.text
-jump:
+# .text
+# jump:
 
-"""
+# """
 
         # Sample input for r-type
 #         sample_input = """.text
@@ -72,21 +72,20 @@ jump:
 #         sample_input = """.text
 # addi x0, x1, 0x2
 # slti x3, x4, 0x5
-# slli x6, x7, 2323
+# slli x6, x7, 4
 # srli x9, x10, 34543
 # andi x12, x13, 0xfff
 # ori x15, x22, 234
 # xori x31, x19, 0xabcdef
 # """
 
-# Sample input for s-type
+        # Sample input for s-type
 #         sample_input = """.text
-# sw x0, (x02)
-# sw x0, 0(x12)
-# lw x2, 3(x31)
+# lw x6, 0(x8)
+# sw x10, (x9)
 # """
 
-       # Sample input for sb-type
+        # Sample input for sb-type
 #         sample_input = """.text
 # beq x0, x02, jumper
 #  bne x0, x02, _test
@@ -178,7 +177,6 @@ jump:
                 # immediate
                 thirtyone_to_twenty = matched_string[3]
 
-                # parse hex (there should be another rule for non hex
                 thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
 
                 # pad to 12 bits
@@ -209,18 +207,31 @@ jump:
                 return row_to_return
             
             def s_type():
+                
+                immediate = '0' if matched_string[2] == '' else matched_string[2]
+                immediate = bin(int(immediate))[2:].zfill(12)
+                immi_0_4 = int(immediate[::-1][0:4][::-1], 2)
+
                 # op code
                 six_to_zero = taxonomy_details['6-0']
-                # rd
-                eleven_to_seven = 0
                 # funct3
                 fourteen_to_twelve = taxonomy_details['14-12']
-                # rs1
-                nineteen_to_fifteen = matched_string[1]
-                # rs2
-                twentyfour_to_twenty = 0
                 # funct7
-                thirtyone_to_twentyfive = 0
+                thirtyone_to_twentyfive = int(immediate[::-1][5:12][::-1], 2)
+
+                if instruction == 'sw':
+                    #rd
+                    eleven_to_seven = immi_0_4
+                    # rs2
+                    twentyfour_to_twenty = matched_string[1]
+                elif instruction == 'lw':
+                    #rd
+                    eleven_to_seven = matched_string[1]
+                    # rs2
+                    twentyfour_to_twenty = immi_0_4
+
+                # rs 1
+                nineteen_to_fifteen = matched_string[3]
 
                 row_to_return = {
                     '31-25': thirtyone_to_twentyfive,
@@ -243,7 +254,7 @@ jump:
                 # rs1
                 nineteen_to_fifteen = matched_string[1]
                 # rs2
-                twentyfour_to_twenty = 0
+                twentyfour_to_twenty = matched_string[2]
                 # funct7
                 thirtyone_to_twentyfive = 0
 
@@ -284,15 +295,11 @@ jump:
                 # Get value of variable
                 var_name = matched_string[0]
                 value = matched_string[2]
+                value = bin(int(value, 16))
 
                 if var_name in self.variables.keys(): return False
 
                 self.variables[var_name] = {}
-
-                if value[0:2] == '0x':
-                    value = bin(int(value, 16))
-                else:
-                    value = bin(int(value))
 
                 # Get current address to place variable
                 address = self.current_data_segment
@@ -327,8 +334,8 @@ jump:
 
         self.variables = {}
         self.jump_instructions = {}
-        self.current_data_segment = '11111111111' # 0x000007ff in binary
-        self.current_instruction_address = '10000000000000001111111111111' # 0x10001fff in binary
+        self.current_data_segment = '0b11111111111' # 0x000007ff in binary
+        self.current_instruction_address = '0b10000000000000001111111111111' # 0x10001fff in binary
         self.binary_table_df = pd.DataFrame(columns=['instruction', '31-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
 
         #For testing
@@ -416,6 +423,7 @@ jump:
             print(self.variables)
             print('==========================================')
             print('Opcodes:')
+            # print(self.binary_table_df)
             self.print_formatted_table()
             print('==========================================')
 

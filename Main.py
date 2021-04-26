@@ -88,14 +88,16 @@ class Main(tk.Frame):
         # Sample input for sb-type
         sample_input = """.data
 var1: .word 0x0f
-var2: .word 2
-var3: .word 0x08
+var2: .word 15
 .text
+addi x3, x4, 0x0ff
+addi x3, x5, 255
 jumper:
 lw x6, 0(x8)
 beq x0, x02, jumper
 .data
 var4: .word 33
+var5: .word 0x21
 .text
 add x3, x4, x7
 slti x3, x4, 0x5
@@ -188,7 +190,11 @@ slti x3, x4, 0x5
                 # immediate
                 thirtyone_to_twenty = matched_string[3]
 
-                thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
+                #thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
+                if thirtyone_to_twenty[0:2] == '0x':
+                    thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
+                else:
+                    thirtyone_to_twenty = bin(int(thirtyone_to_twenty))
 
                 # pad to 12 bits
                 thirtyone_to_twenty = thirtyone_to_twenty[2:].zfill(12)
@@ -348,7 +354,12 @@ slti x3, x4, 0x5
                 # Get value of variable
                 var_name = matched_string[0]
                 value = matched_string[2]
-                value = bin(int(value, 16))
+                # value = bin(int(value, 16))
+
+                if value[0:2] == '0x':
+                    value = bin(int(value, 16))
+                else:
+                    value = bin(int(value))
 
                 if var_name in self.variables.keys(): return False
 
@@ -356,7 +367,8 @@ slti x3, x4, 0x5
 
                 # Get current address to place variable
                 address = self.current_data_segment
-                self.current_data_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
+                # Increment by 4 the current address and pad with zeroes until 32 bits
+                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#032b') 
 
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address

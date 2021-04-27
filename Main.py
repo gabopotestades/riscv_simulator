@@ -93,7 +93,9 @@ var2: .word 15
 addi x3, x4, 0x0ff
 addi x3, x5, 255
 jumper:
-lw x6, 0(x8)
+lw x1, var1
+lw x1, var2
+sw x1, var2
 beq x0, x02, jumper
 .data
 var4: .word 33
@@ -117,7 +119,7 @@ slti x3, x4, 0x5
     # Pad binary digits
     def print_formatted_table(self):
         print_df = self.binary_table_df.copy()
-        print_df['address'] = print_df['address'].apply(lambda x: x[2:].zfill(32))
+        print_df['address'] = print_df['address'].apply(lambda x: x[2:].zfill(16))
         print_df['31-25']   = print_df['31-25'].apply(lambda x: x[2:].zfill(7)[::-1][0:8][::-1])
         print_df['24-20']   = print_df['24-20'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
         print_df['19-15']   = print_df['19-15'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
@@ -225,8 +227,17 @@ slti x3, x4, 0x5
             
             def s_type():
                 
-                immediate = '0' if matched_string[2] == '' else matched_string[2]
-                immediate = bin(int(immediate))[2:].zfill(12)
+                # Old way of computing immediate value for opcode
+                # immediate = '0' if matched_string[2] == '' else matched_string[2]
+                variable_name = matched_string[2]
+
+                if variable_name in self.variables.keys():
+                    immediate = self.variables[variable_name]['address']
+                    immediate = immediate[2:].zfill(12)
+                else:
+                    # Kapag wala sa listahan, zero muna
+                    immediate = bin(0)[2:].zfill(12)
+
                 immi_0_4 = int(immediate[::-1][0:4][::-1], 2)
 
                 # op code
@@ -248,7 +259,8 @@ slti x3, x4, 0x5
                     twentyfour_to_twenty = immi_0_4
 
                 # rs 1
-                nineteen_to_fifteen = matched_string[3]
+                # nineteen_to_fifteen = matched_string[3] # Old way of getting rs1 in lw/sw    
+                nineteen_to_fifteen = 0 # Set to 0 since we get from x0
 
                 row_to_return = {
                     '31-25': thirtyone_to_twentyfive,
@@ -368,7 +380,7 @@ slti x3, x4, 0x5
                 # Get current address to place variable
                 address = self.current_data_segment
                 # Increment by 4 the current address and pad with zeroes until 32 bits
-                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#032b') 
+                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#012b') 
 
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address
@@ -425,8 +437,8 @@ slti x3, x4, 0x5
 
         self.variables = {}
         self.jump_instructions = {}
-        self.current_data_segment = '0b00000000000000000000011111111111' # 0x000007ff in binary
-        self.current_text_segment = '0b00010000000000000001111111111111' # 0x10001fff in binary
+        self.current_data_segment = '0b000000000000' # 0x0000 in binary
+        self.current_text_segment = '0b1000000000000' # 0x1000 in binary
         self.binary_table_df = pd.DataFrame(columns=['address', 'instruction', '31-25', '24-20', '19-15', '14-12', '11-7', '6-0'])
 
         #For testing
@@ -542,7 +554,10 @@ if __name__ == "__main__":
         "jump": r'^([a-z_][\w]*)[\s]*:$'
     }
 
-    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
+    # Old regex for load store
+    # regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
+
+    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
     regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$"
     regex_branching_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"

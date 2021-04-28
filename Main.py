@@ -93,8 +93,10 @@ var2: .word 15
 addi x3, x4, 0x0ff
 addi x3, x5, 255
 jumper:
+lw x1, +15
 lw x1, var1
-lw x1, var2
+lw x1, 0(x15)
+lw x1, -15(x0)
 sw x1, var2
 beq x0, x02, jumper
 .data
@@ -153,6 +155,13 @@ slti x3, x4, 0x5
 
         # If is_command is True, convert the command to opcode
         if is_command:
+
+            def represents_int(s):
+                try: 
+                    int(s)
+                    return True
+                except ValueError:
+                    return False
 
             def r_type():
                 # op code
@@ -231,12 +240,17 @@ slti x3, x4, 0x5
                 # immediate = '0' if matched_string[2] == '' else matched_string[2]
                 variable_name = matched_string[2]
 
-                if variable_name in self.variables.keys():
+                if variable_name[0:2] == '0x':
+                    immediate = bin(int(variable_name, 16))
+                elif represents_int(variable_name):
+                    immediate = bin(int(variable_name))
+                elif variable_name in self.variables.keys():
                     immediate = self.variables[variable_name]['address']
-                    immediate = immediate[2:].zfill(12)
                 else:
                     # Kapag wala sa listahan, zero muna
-                    immediate = bin(0)[2:].zfill(12)
+                    immediate = bin(0)
+                
+                immediate = immediate[2:].zfill(12)
 
                 immi_0_4 = int(immediate[::-1][0:4][::-1], 2)
 
@@ -259,8 +273,11 @@ slti x3, x4, 0x5
                     twentyfour_to_twenty = immi_0_4
 
                 # rs 1
-                # nineteen_to_fifteen = matched_string[3] # Old way of getting rs1 in lw/sw    
-                nineteen_to_fifteen = 0 # Set to 0 since we get from x0
+                # nineteen_to_fifteen = matched_string[3] # Old way of getting rs1 in lw/sw
+                if matched_string[5]:
+                    nineteen_to_fifteen = matched_string[5]
+                else:
+                    nineteen_to_fifteen = 0
 
                 row_to_return = {
                     '31-25': thirtyone_to_twentyfive,
@@ -364,8 +381,8 @@ slti x3, x4, 0x5
             if instruction == 'variable':
 
                 # Get value of variable
-                var_name = matched_string[0]
-                value = matched_string[2]
+                var_name = matched_string[1]
+                value = matched_string[3]
                 # value = bin(int(value, 16))
 
                 if value[0:2] == '0x':
@@ -398,7 +415,7 @@ slti x3, x4, 0x5
             #Returns false if jump instrution already in the table
             elif instruction == 'jump':
                 
-                jump_inst = matched_string[0]
+                jump_inst = matched_string[1]
 
                 if jump_inst in self.jump_instructions.keys(): return False
 
@@ -549,15 +566,15 @@ if __name__ == "__main__":
         # reserved word
         "text": r'^.(text)$',
         # variable d/eclaration
-        "variable": r'^([a-z_][\w]*)[\s]*:[\s]*(.word)[\s]+([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$',
+        "variable": r'^(?!^x(0|0?[1-9]|[12][0-9]|3[01]):)([a-z_][\w]*)[\s]*:[\s]*(.word)[\s]+([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$',
         # jump declaration
-        "jump": r'^([a-z_][\w]*)[\s]*:$'
+        "jump": r'(?!^x(0|0?[1-9]|[12][0-9]|3[01]):$)^([a-z_][\w]*)[\s]*:$'
     }
 
     # Old regex for load store
     # regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
 
-    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"
+    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*((?!x(0|0?[1-9]|[12][0-9]|3[01]))[a-z_][\w]+|[-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)?(\(x(0|0?[1-9]|[12][0-9]|3[01])\))?$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
     regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$"
     regex_branching_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"

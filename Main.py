@@ -97,13 +97,16 @@ lw x1, +15
 lw x1, var1
 lw x1, 0(x15)
 lw x1, -15(x0)
-sw x1, var2
+lw x1, -2
+sw x1, -2
+sw x2, var2
 beq x0, x02, jumper
 .data
 var4: .word 33
 var5: .word 0x21
 .text
 add x3, x4, x7
+addi x6, x23, -2
 slti x3, x4, 0x5
  """
 
@@ -201,14 +204,15 @@ slti x3, x4, 0x5
                 # immediate
                 thirtyone_to_twenty = matched_string[3]
 
-                #thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
                 if thirtyone_to_twenty[0:2] == '0x':
-                    thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))
+                    thirtyone_to_twenty = bin(int(thirtyone_to_twenty, 16))[2:].zfill(12)
                 else:
-                    thirtyone_to_twenty = bin(int(thirtyone_to_twenty))
+                    string_to_int = int(thirtyone_to_twenty)
+                    if string_to_int > -1:
+                        thirtyone_to_twenty = bin(string_to_int)[2:].zfill(12)
+                    else:
+                        thirtyone_to_twenty = bin(string_to_int & 0xfff)[2:]
 
-                # pad to 12 bits
-                thirtyone_to_twenty = thirtyone_to_twenty[2:].zfill(12)
                 thirtyone_to_twenty = thirtyone_to_twenty[-12:len(thirtyone_to_twenty)]
                 
                 # print(f"hex received: {thirtyone_to_twenty} in int: {int(thirtyone_to_twenty, 16)} in raw: {matched_string[3]}")
@@ -241,18 +245,20 @@ slti x3, x4, 0x5
                 variable_name = matched_string[2]
 
                 if variable_name[0:2] == '0x':
-                    immediate = bin(int(variable_name, 16))
+                    immediate = bin(int(variable_name, 16))[2:].zfill(12)
                 elif represents_int(variable_name):
-                    immediate = bin(int(variable_name))
+                    var_as_int = int(variable_name)
+                    if var_as_int > -1:
+                        immediate = bin(int(variable_name))[2:].zfill(12)
+                    else:
+                        immediate = bin(var_as_int & 0xfff)[2:] #for two's complement
                 elif variable_name in self.variables.keys():
                     immediate = self.variables[variable_name]['address']
                 else:
                     # Kapag wala sa listahan, zero muna
-                    immediate = bin(0)
-                
-                immediate = immediate[2:].zfill(12)
+                    immediate = bin(0)[2:].zfill(12)
 
-                immi_0_4 = int(immediate[::-1][0:4][::-1], 2)
+                immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
 
                 # op code
                 six_to_zero = taxonomy_details['6-0']
@@ -301,7 +307,11 @@ slti x3, x4, 0x5
                     immediate = (int(self.jump_instructions[jump_inst], 2) - int(self.current_text_segment, 2)) // 2
 
                     original_binary = bin(immediate & 0xfff)[2:]
-                    immediate = bin(immediate & 0xfff)[2:][::-1] #for two's complement
+
+                    if immediate > -1:
+                        immediate = bin(immediate)[2:].zfill(12)[::-1]
+                    else:
+                        immediate = bin(immediate & 0xfff)[2:][::-1] #for two's complement
 
                     # Get the 4 parts of the immediate value
                     imm_12 = immediate[11]
@@ -312,11 +322,11 @@ slti x3, x4, 0x5
 
                     # For checking if slicing of binary value is correct
                     
-                    # print(f'Original: {original_binary}')
-                    # print(f'Reversed: {immediate}')
-                    # print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
-                    # checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
-                    # print(f'Checking: {checking_result}')
+                    print(f'Original: {original_binary}')
+                    print(f'Reversed: {immediate}')
+                    print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
+                    checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
+                    print(f'Checking: {checking_result}')
 
                     # rd
                     eleven_to_seven = int(imm_4_1 + imm_11, 2)
@@ -419,25 +429,13 @@ slti x3, x4, 0x5
 
                 if jump_inst in self.jump_instructions.keys(): return False
 
-                row_to_return = {
-                    '31-25': '0b0',
-                    '24-20': '0b0',
-                    '19-15': '0b0',
-                    '14-12': '0b0',
-                    '11-7': '0b0',
-                    '6-0': '0b0'
-                }
-
-                address = self.current_text_segment
-                
+                address = self.current_text_segment              
                 self.jump_instructions[jump_inst] = address
 
-                row_to_return['address'] = address
-                row_to_return['instruction'] = jump_inst
-
-                self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
+                # Commented out, jump doesn't need to be added as a intruction
+                # self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
                 
-                return row_to_return
+                return True
 
     # Gets the string from the edit text box
     def evaluate(self): 
@@ -499,10 +497,7 @@ slti x3, x4, 0x5
                         if key == 'jump':
                             if self.is_text:
                                 result = self.parse_instruction(key, match_regex.groups(), False)
-                                if result:
-                                    self.binary_table_df = self.binary_table_df.append(result, ignore_index=True)
-                                    msg = match_regex.groups()
-                                else:
+                                if not result:
                                     msg = f"Line: {self.line_counter}, Error: Instruction '{match_regex[1]}' is already defined."
                             else:
                                 msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."

@@ -97,9 +97,11 @@ lw x1, +15
 lw x1, var1
 lw x1, 0(x15)
 lw x1, -15(x0)
+lw x1, 0xf
 lw x1, -2
 sw x1, -2
 sw x2, var2
+sw x3, 0xc
 beq x0, x02, jumper
 .data
 var4: .word 33

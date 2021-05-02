@@ -85,32 +85,43 @@ class Main(tk.Frame):
 # sw x10, (x9)
 # """
 
+
         # Sample input for sb-type
         sample_input = """.data
-var1: .word 0x0f
-var2: .word 15
+var1: .word 1
 .text
-addi x3, x4, 0x0ff
-addi x3, x5, 255
+lw x10, var1
+lw x9, var2
+beq x9, x02, jumper
 jumper:
-lw x1, +15
-lw x1, var1
-lw x1, 0(x15)
-lw x1, -15(x0)
-lw x1, 0xf
-lw x1, -2
-sw x1, -2
-sw x2, var2
-sw x3, 0xc
-beq x0, x02, jumper
-.data
-var4: .word 33
-var5: .word 0x21
-.text
-add x3, x4, x7
-addi x6, x23, -2
-slti x3, x4, 0x5
- """
+lw x10, var1
+        """
+#         .data
+# var1: .word 0x0f
+# var2: .word 15
+# .text
+# addi x3, var2, 0x0ff
+# addi x3, x4, 0x0ff
+# addi x3, x5, 255
+# jumper:
+# lw x1, +15
+# lw x1, var1
+# lw x1, 0(x15)
+# lw x1, -15(x0)
+# lw x1, 0xf
+# lw x1, -2
+# sw x1, -2
+# sw x2, var2
+# sw x3, 0xc
+# beq x0, x02, jumper
+# .data
+# var4: .word 33
+# var5: .word 0x21
+# .text
+# add x3, x4, x7
+# addi x6, x23, -2
+# slti x3, x4, 0x5
+#
 
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")
@@ -246,6 +257,7 @@ slti x3, x4, 0x5
                 # immediate = '0' if matched_string[2] == '' else matched_string[2]
                 variable_name = matched_string[2]
 
+                pending_variable_name = None
                 if variable_name[0:2] == '0x':
                     immediate = bin(int(variable_name, 16))[2:].zfill(12)
                 elif represents_int(variable_name):
@@ -258,6 +270,7 @@ slti x3, x4, 0x5
                     immediate = self.variables[variable_name]['address']
                 else:
                     # Kapag wala sa listahan, zero muna
+                    pending_variable_name = variable_name
                     immediate = bin(0)[2:].zfill(12)
 
                 immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
@@ -293,7 +306,8 @@ slti x3, x4, 0x5
                     '19-15': nineteen_to_fifteen,
                     '14-12': fourteen_to_twelve,
                     '11-7': eleven_to_seven,
-                    '6-0': six_to_zero
+                    '6-0': six_to_zero,
+                    'pending_variable': pending_variable_name
                 }
 
                 return row_to_return
@@ -301,6 +315,8 @@ slti x3, x4, 0x5
             def sb_type():
 
                 jump_inst = matched_string[3]
+
+                pending_jump_name = None
 
                 # If jump instruction already in lookup, get the immediate
                 if jump_inst in self.jump_instructions.keys():
@@ -338,7 +354,7 @@ slti x3, x4, 0x5
                 else:
 
                     # Dito yung kailangan word yung wala pang jump instruction sa look up
-
+                    pending_jump_name = jump_inst
                     # rd
                     eleven_to_seven = 0
                     # funct7
@@ -359,7 +375,8 @@ slti x3, x4, 0x5
                     '19-15': nineteen_to_fifteen,
                     '14-12': fourteen_to_twelve,
                     '11-7': eleven_to_seven,
-                    '6-0': six_to_zero
+                    '6-0': six_to_zero,
+                    'pending_jump': pending_jump_name
                 }
 
                 return row_to_return
@@ -374,11 +391,26 @@ slti x3, x4, 0x5
                 row_to_return = s_type()
             elif taxonomy_details['type'] == 'sb-type':
                 row_to_return = sb_type()
+            else:
+                raise Exception(f"Unmapped instruction type '{taxonomy_details['type']}'")
+
+            if 'pending_jump' in row_to_return:
+                pending_jump_name_temp = row_to_return['pending_jump']
+            else:
+                pending_jump_name_temp = None
+
+            if 'pending_variable' in row_to_return:
+                pending_variable_name_temp = row_to_return['pending_variable']
+            else:
+                pending_variable_name_temp = None
 
             # Cast to binary
-            row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()}
+            row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()
+                             if key not in ['pending_jump', 'pending_variable']}
 
             address = self.current_text_segment
+            row_to_return['pending_variable'] = pending_variable_name_temp
+            row_to_return['pending_jump'] = pending_jump_name_temp
             row_to_return['address'] = address
             row_to_return['instruction'] = instruction
 
@@ -438,6 +470,25 @@ slti x3, x4, 0x5
                 # self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
                 
                 return True
+
+    def populate_pending_jumps(self):
+        print("in populate pending jump")
+        self.print_formatted_table()
+
+        for index, row in self.binary_table_df.iterrows():
+            if row['pending_jump'] is not None:
+                jump_inst = row['pending_jump']
+
+                # self.parse_instruction(self, row['instruction'], matched_string, False)
+
+    def populate_pending_variables(self):
+        print("in populate pending variables")
+        self.print_formatted_table()
+
+        for index, row in self.binary_table_df.iterrows():
+            if row['pending_variable'] is not None:
+                row['pending_variable']
+
 
     # Gets the string from the edit text box
     def evaluate(self): 
@@ -550,7 +601,8 @@ slti x3, x4, 0x5
             # print(self.binary_table_df)
             self.print_formatted_table()
             print('==========================================')
-
+            self.populate_pending_jumps()
+            self.populate_pending_variables()
 
 if __name__ == "__main__":
 

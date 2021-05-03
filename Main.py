@@ -95,6 +95,9 @@ var1: .word 1
 .text
 lw x9, var1
 lw x10, var2
+beq x9, x10, jumper
+jumper:
+lw x0, var1
 .data
 var2: .word 2
 
@@ -491,7 +494,72 @@ var2: .word 2
             if row['pending_jump'] is not None:
                 jump_inst = row['pending_jump']
 
-                # self.parse_instruction(self, row['instruction'], matched_string, False)
+                if jump_inst not in self.jump_instructions.keys():
+                    raise Exception(f"Error: {jump_inst} was never declared.")
+
+                # Offset =  current address divided by 2 - jump instruction address  (swapped, basis is sb_type function)
+                immediate = (int(row['address'], 2) - int(self.jump_instructions[jump_inst], 2)) // 2
+
+                original_binary = bin(immediate & 0xfff)[2:]
+
+                if immediate > -1:
+                    immediate = bin(immediate)[2:].zfill(12)[::-1]
+                else:
+                    immediate = bin(immediate & 0xfff)[2:][::-1]  # for two's complement
+
+                # Get the 4 parts of the immediate value
+                imm_12 = immediate[11]
+                imm_10_5 = immediate[5:10][::-1]
+                imm_4_1 = immediate[0:5][::-1]
+                imm_11 = immediate[10]
+
+                # For checking if slicing of binary value is correct
+
+                print(f'Original: {original_binary}')
+                print(f'Reversed: {immediate}')
+                print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
+                checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
+                print(f'Checking: {checking_result}')
+
+                # rd
+                eleven_to_seven = int(imm_4_1 + imm_11, 2)
+                # funct7
+                thirtyone_to_twentyfive = int(imm_12 + imm_10_5, 2)
+
+                # cast to binary
+                eleven_to_seven = bin(int(eleven_to_seven))
+                thirtyone_to_twentyfive = bin(int(thirtyone_to_twentyfive))
+
+                row_to_return = {
+                    'address': row['address'],
+                    'instruction': row['instruction'],
+                    '31-25': thirtyone_to_twentyfive,
+                    '24-20': row['24-20'],
+                    '19-15': row['19-15'],
+                    '14-12': row['14-12'],
+                    '11-7': eleven_to_seven,
+                    '6-0': row['6-0'],
+                    'pending_jump': None,
+                    'pending_variable': row['pending_variable']
+                }
+
+                print("#" * 100)
+                print("START UPDATE FUNCTION")
+                print("#" * 100)
+
+                print(f"Will update binary df for pending function '{jump_inst}' with values:")
+                print(row_to_return)
+
+                print("Before update:")
+                self.print_formatted_table()
+
+                print("After update:")
+                self.binary_table_df.at[index] = row_to_return
+                self.print_formatted_table()
+                print("#" * 100)
+                print("END UPDATE FUNCTION")
+                print("#" * 100)
+
 
     def populate_pending_variables(self):
         print("in populate pending variables")
@@ -536,15 +604,11 @@ var2: .word 2
                     'pending_variable': None
                 }
 
-
-                print("Will update binary df with values:")
+                print("#" * 100)
+                print("START UPDATE VARIABLE")
+                print("#" * 100)
+                print(f"Will update binary for pending variable '{variable_name}' with values:")
                 print(row_to_return)
-
-
-                # # cast on the values that are affected by the update
-                # row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()
-                #                  if key in ['31-25', '24-20', '11-7'] and 'b' not in key}
-
 
                 print("Before update:")
                 self.print_formatted_table()
@@ -552,7 +616,9 @@ var2: .word 2
                 print("After update:")
                 self.binary_table_df.at[index] = row_to_return
                 self.print_formatted_table()
-
+                print("#" * 100)
+                print("END UPDATE VARIABLE")
+                print("#" * 100)
 
 
 
@@ -667,7 +733,7 @@ var2: .word 2
             # print(self.binary_table_df)
             self.print_formatted_table()
             print('==========================================')
-            # self.populate_pending_jumps()
+            self.populate_pending_jumps()
             self.populate_pending_variables()
 
 if __name__ == "__main__":

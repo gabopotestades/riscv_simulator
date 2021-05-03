@@ -3,7 +3,10 @@ import sys
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
 import pandas as pd
-
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
 
 class Main(tk.Frame):
 
@@ -90,12 +93,21 @@ class Main(tk.Frame):
         sample_input = """.data
 var1: .word 1
 .text
-lw x10, var1
-lw x9, var2
-beq x9, x02, jumper
-jumper:
-lw x10, var1
+lw x9, var1
+lw x10, var2
+.data
+var2: .word 2
+
         """
+# """
+# var1: .word 1
+# .text
+# lw x10, var1
+# lw x9, var2
+# beq x9, x02, jumper
+# jumper:
+# lw x10, var1
+# """
 #         .data
 # var1: .word 0x0f
 # var2: .word 15
@@ -361,7 +373,7 @@ lw x10, var1
                     thirtyone_to_twentyfive = 0
 
                 # op code
-                six_to_zero = 63
+                six_to_zero = 99
                 # funct3
                 fourteen_to_twelve = taxonomy_details['14-12']
                 # rs1
@@ -487,7 +499,61 @@ lw x10, var1
 
         for index, row in self.binary_table_df.iterrows():
             if row['pending_variable'] is not None:
-                row['pending_variable']
+                variable_name = row['pending_variable']
+                instruction = row['instruction']
+
+                if variable_name in self.variables.keys():
+                    immediate = self.variables[variable_name]['address']
+                else:
+                    raise Exception(f"Error: {variable_name} was never declared.")
+
+                immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
+
+                # funct7
+                thirtyone_to_twentyfive = bin(int(immediate[::-1][5:12][::-1], 2))
+
+                if instruction == 'sw':
+                    #rd
+                    eleven_to_seven = bin(int(immi_0_4))
+                    # rs2
+                    twentyfour_to_twenty = row['11-7']
+                elif instruction == 'lw':
+                    #rd
+                    eleven_to_seven = row['11-7']
+                    # rs2
+                    twentyfour_to_twenty = bin(int(immi_0_4))
+
+                row_to_return = {
+                    'address': row['address'],
+                    'instruction': instruction,
+                    '31-25': thirtyone_to_twentyfive,
+                    '24-20': twentyfour_to_twenty,
+                    '19-15': row['19-15'],
+                    '14-12': row['14-12'],
+                    '11-7': eleven_to_seven,
+                    '6-0': row['6-0'],
+                    'pending_jump': row['pending_jump'],
+                    'pending_variable': None
+                }
+
+
+                print("Will update binary df with values:")
+                print(row_to_return)
+
+
+                # # cast on the values that are affected by the update
+                # row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()
+                #                  if key in ['31-25', '24-20', '11-7'] and 'b' not in key}
+
+
+                print("Before update:")
+                self.print_formatted_table()
+
+                print("After update:")
+                self.binary_table_df.at[index] = row_to_return
+                self.print_formatted_table()
+
+
 
 
     # Gets the string from the edit text box
@@ -601,7 +667,7 @@ lw x10, var1
             # print(self.binary_table_df)
             self.print_formatted_table()
             print('==========================================')
-            self.populate_pending_jumps()
+            # self.populate_pending_jumps()
             self.populate_pending_variables()
 
 if __name__ == "__main__":

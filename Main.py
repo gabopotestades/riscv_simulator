@@ -27,8 +27,8 @@ class Main(tk.Frame):
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
 
-        self.variables = None
-        self.jump_instructions = None
+        self.variables = {}
+        self.jump_instructions = {}
 
         self.current_data_segment = None
         self.current_text_segment = None
@@ -39,10 +39,10 @@ class Main(tk.Frame):
 
     # Create the objects in the screen
     def create_widgets(self):
-        menu_evaluate = Button(self.master, text="Execute", command=self.evaluate, bg="lightgreen", fg="black")
+        menu_evaluate = Button(self.master, text="Assemble", command=self.evaluate, bg="lightgreen", fg="black")
         menu_evaluate.pack(fill="x")
 
-        step_one_label = Label(self.master, text="EDIT",  background="grey", foreground="white")
+        step_one_label = Label(self.master, text="INSTRUCTIONS",  background="grey", foreground="white")
         step_one_label.config(anchor=CENTER)
         step_one_label.pack(fill="x")
 
@@ -90,53 +90,46 @@ class Main(tk.Frame):
 
 
         # Sample input for sb-type
-        sample_input = """.data
-var1: .word 1
-.text
-lw x9, var1
-lw x10, var2
-beq x9, x10, jumper
-jumper:
-lw x0, var1
-.data
-var2: .word 2
-
-        """
-# """
+#         sample_input = """.data
 # var1: .word 1
 # .text
-# lw x10, var1
-# lw x9, var2
-# beq x9, x02, jumper
+# lw x9, var1
+# lw x10, var2
+# beq x9, x10, jumper
 # jumper:
-# lw x10, var1
-# """
-#         .data
-# var1: .word 0x0f
-# var2: .word 15
-# .text
-# addi x3, var2, 0x0ff
-# addi x3, x4, 0x0ff
-# addi x3, x5, 255
-# jumper:
-# lw x1, +15
-# lw x1, var1
-# lw x1, 0(x15)
-# lw x1, -15(x0)
-# lw x1, 0xf
-# lw x1, -2
-# sw x1, -2
-# sw x2, var2
-# sw x3, 0xc
-# beq x0, x02, jumper
+# lw x0, var1
 # .data
-# var4: .word 33
-# var5: .word 0x21
-# .text
-# add x3, x4, x7
-# addi x6, x23, -2
-# slti x3, x4, 0x5
-#
+# var2: .word 2
+#         """
+
+
+        sample_input =  """.data
+var1: .word 0x0f
+var2: .word 15
+.text
+addi x3, x31, 0x0ff
+addi x3, x4, 0x0ff
+addi x3, x5, 255
+beq x0, x02, jumper
+lw x1, +15
+lw x1, var1
+lw x1, 0(x15)
+lw x1, -15(x0)
+lw x1, 0xf
+lw x6, var5
+jumper:
+lw x1, -2
+sw x1, -2
+sw x2, var2
+sw x3, 0xc
+.data
+var4: .word 33
+var5: .word 0x21
+.text
+add x3, x4, x7
+addi x6, x23, -2
+slti x3, x4, 0x5
+"""
 
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")
@@ -149,6 +142,17 @@ var2: .word 2
         self.terminal_text.config()
         self.terminal_text.pack(fill="x")
     
+
+    def print_jump_intructions(self):
+        for key, value in self.jump_instructions.items():
+            print(f'{key}: {value}')
+
+    def print_variables(self):
+        for key, value in self.variables.items():
+            var_value = value['value']
+            address = value['address']
+            print(f'{key}: Address - {address} | Value - {var_value}')
+
     # Pad binary digits
     def print_formatted_table(self):
         print_df = self.binary_table_df.copy()
@@ -355,11 +359,11 @@ var2: .word 2
 
                     # For checking if slicing of binary value is correct
                     
-                    print(f'Original: {original_binary}')
-                    print(f'Reversed: {immediate}')
-                    print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
-                    checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
-                    print(f'Checking: {checking_result}')
+                    # print(f'Original: {original_binary}')
+                    # print(f'Reversed: {immediate}')
+                    # print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
+                    # checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
+                    # print(f'Checking: {checking_result}')
 
                     # rd
                     eleven_to_seven = int(imm_4_1 + imm_11, 2)
@@ -456,7 +460,7 @@ var2: .word 2
                 # Get current address to place variable
                 address = self.current_data_segment
                 # Increment by 4 the current address and pad with zeroes until 32 bits
-                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#012b') 
+                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#014b') 
 
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address
@@ -486,9 +490,12 @@ var2: .word 2
                 
                 return True
 
+    # Search if pending jumps are declared
     def populate_pending_jumps(self):
-        print("in populate pending jump")
-        self.print_formatted_table()
+
+        if self.test:
+            print("in populate pending jump")
+            self.print_formatted_table()
 
         for index, row in self.binary_table_df.iterrows():
             if row['pending_jump'] is not None:
@@ -515,11 +522,11 @@ var2: .word 2
 
                 # For checking if slicing of binary value is correct
 
-                print(f'Original: {original_binary}')
-                print(f'Reversed: {immediate}')
-                print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
-                checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
-                print(f'Checking: {checking_result}')
+                # print(f'Original: {original_binary}')
+                # print(f'Reversed: {immediate}')
+                # print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
+                # checking_result = original_binary == (imm_12 + imm_11 + imm_10_5 + imm_4_1)
+                # print(f'Checking: {checking_result}')
 
                 # rd
                 eleven_to_seven = int(imm_4_1 + imm_11, 2)
@@ -543,27 +550,32 @@ var2: .word 2
                     'pending_variable': row['pending_variable']
                 }
 
-                print("#" * 100)
-                print("START UPDATE FUNCTION")
-                print("#" * 100)
+                if self.test:
+                    print("#" * 100)
+                    print("START UPDATE FUNCTION")
+                    print("#" * 100)
 
-                print(f"Will update binary df for pending function '{jump_inst}' with values:")
-                print(row_to_return)
+                    print(f"Will update binary df for pending function '{jump_inst}' with values:")
+                    print(row_to_return)
 
-                print("Before update:")
-                self.print_formatted_table()
+                    print("Before update:")
+                    self.print_formatted_table()
 
-                print("After update:")
                 self.binary_table_df.at[index] = row_to_return
-                self.print_formatted_table()
-                print("#" * 100)
-                print("END UPDATE FUNCTION")
-                print("#" * 100)
 
+                if self.test:
+                    print("After update:")
+                    self.print_formatted_table()
+                    print("#" * 100)
+                    print("END UPDATE FUNCTION")
+                    print("#" * 100)
 
+    # Search if pending variables are declared
     def populate_pending_variables(self):
-        print("in populate pending variables")
-        self.print_formatted_table()
+
+        if self.test:
+            print("in populate pending variables")
+            self.print_formatted_table()
 
         for index, row in self.binary_table_df.iterrows():
             if row['pending_variable'] is not None:
@@ -604,23 +616,24 @@ var2: .word 2
                     'pending_variable': None
                 }
 
-                print("#" * 100)
-                print("START UPDATE VARIABLE")
-                print("#" * 100)
-                print(f"Will update binary for pending variable '{variable_name}' with values:")
-                print(row_to_return)
+                if self.test:
+                    print("#" * 100)
+                    print("START UPDATE VARIABLE")
+                    print("#" * 100)
+                    print(f"Will update binary for pending variable '{variable_name}' with values:")
+                    print(row_to_return)
 
-                print("Before update:")
-                self.print_formatted_table()
+                    print("Before update:")
+                    self.print_formatted_table()
 
-                print("After update:")
                 self.binary_table_df.at[index] = row_to_return
-                self.print_formatted_table()
-                print("#" * 100)
-                print("END UPDATE VARIABLE")
-                print("#" * 100)
 
-
+                if self.test:
+                    print("After update:")
+                    self.print_formatted_table()
+                    print("#" * 100)
+                    print("END UPDATE VARIABLE")
+                    print("#" * 100)
 
     # Gets the string from the edit text box
     def evaluate(self): 
@@ -645,7 +658,7 @@ var2: .word 2
         results = []
 
         for command in list_of_commands:
-            msg = ""
+            msg = None
             match_found = False
             formatted_command = command.lower().strip()
 
@@ -662,7 +675,7 @@ var2: .word 2
                     if self.is_text:
                         row_to_add = self.parse_instruction(key, match_regex.groups(), True)
                         self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
-                        msg = match_regex.groups()
+                        if self.test: msg = match_regex.groups()
                     else:
                         msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
                     # print("Row to add")
@@ -689,13 +702,13 @@ var2: .word 2
 
                         elif key in ['data', 'text']:
                             row_to_add = self.parse_instruction(key, match_regex.groups(), False)
-                            msg = match_regex.groups()
+                            if self.test: msg = match_regex.groups()
                         
                         elif key == 'variable':
                             if self.is_data:
                                 result = self.parse_instruction(key, match_regex.groups(), False)
                                 if result:
-                                    msg = match_regex.groups()
+                                    if self.test: msg = match_regex.groups()
                                 else:
                                     msg = f"Line: {self.line_counter}, Error: Variable '{match_regex[1]}' is already defined."
                             else:
@@ -703,38 +716,43 @@ var2: .word 2
                         break
 
             if not self.test:
-                results = 'Success!'
-                if not match_regex:
+
+                if not match_regex: 
                     msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
+
+                if msg != None:
+                    self.print_in_terminal(msg)
                     parsing_passed = False
-                    results = msg
                     break
+                
             else:
-
                 if not match_regex:
                     msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
-
                 output_string = f'[{formatted_command}] : {msg}\n'
-
                 results.append(output_string)
 
             self.line_counter += 1
 
         if parsing_passed:
-            self.print_in_terminal(results)
-            print('==========================================')
-            print('Jump Instructions:')
-            print(self.jump_instructions)
-            print('==========================================')
-            print('Declared Variables:')
-            print(self.variables)
-            print('==========================================')
-            print('Opcodes:')
-            # print(self.binary_table_df)
-            self.print_formatted_table()
-            print('==========================================')
+            if self.test:
+                self.print_in_terminal(results)
+
             self.populate_pending_jumps()
             self.populate_pending_variables()
+
+            if not self.test: 
+                self.print_in_terminal('Success in parsing.\n')
+
+            print('=' * 100)
+            print('Jump Instructions:')
+            self.print_jump_intructions()
+            print('=' * 100)
+            print('Declared Variables:')
+            self.print_variables()
+            print('=' * 100)
+            print('Opcodes:')
+            self.print_formatted_table()
+            print('=' * 100)
 
 if __name__ == "__main__":
 
@@ -877,5 +895,5 @@ if __name__ == "__main__":
     }
 
     root = tk.Tk()
-    app = Main(root, commands_dict, reserved_list, True)
+    app = Main(root, commands_dict, reserved_list, False)
     root.mainloop()

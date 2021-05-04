@@ -145,7 +145,6 @@ sll x7, x5, x6
 srl x8, x5, x6
 FIN: 
 addi x0, x0, 0
-sw x2, var2
 """
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")

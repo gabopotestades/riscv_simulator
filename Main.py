@@ -145,6 +145,7 @@ sll x7, x5, x6
 srl x8, x5, x6
 FIN: 
 addi x0, x0, 0
+sw x2, var2
 """
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")
@@ -156,7 +157,7 @@ addi x0, x0, 0
         self.terminal_text = Text(self.master, background="black", foreground="green", height=10)
         self.terminal_text.config()
         self.terminal_text.pack(fill="x")
-    
+
 
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
@@ -178,6 +179,10 @@ addi x0, x0, 0
         print_df['14-12']   = print_df['14-12'].apply(lambda x: x[2:].zfill(3)[::-1][0:3][::-1])
         print_df['11-7']    = print_df['11-7'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
         print_df['6-0']     = print_df['6-0'].apply(lambda x: x[2:].zfill(7)[::-1][0:7][::-1])
+
+        if not self.test:
+            print_df.drop(['line_number', 'pending_jump', 'pending_variable'], axis='columns', inplace=True)
+
         print(print_df)
 
     # Outputs to terminal the processed data
@@ -207,7 +212,7 @@ addi x0, x0, 0
         if is_command:
 
             def represents_int(s):
-                try: 
+                try:
                     int(s)
                     return True
                 except ValueError:
@@ -261,7 +266,7 @@ addi x0, x0, 0
                         thirtyone_to_twenty = bin(string_to_int & 0xfff)[2:]
 
                 thirtyone_to_twenty = thirtyone_to_twenty[-12:len(thirtyone_to_twenty)]
-                
+
                 # print(f"hex received: {thirtyone_to_twenty} in int: {int(thirtyone_to_twenty, 16)} in raw: {matched_string[3]}")
 
                 # convert to binary
@@ -284,9 +289,9 @@ addi x0, x0, 0
                 }
 
                 return row_to_return
-            
+
             def s_type():
-                
+
                 # Old way of computing immediate value for opcode
                 # immediate = '0' if matched_string[2] == '' else matched_string[2]
                 variable_name = matched_string[2]
@@ -373,7 +378,7 @@ addi x0, x0, 0
 
 
                     # For checking if slicing of binary value is correct
-                    
+
                     # print(f'Original: {original_binary}')
                     # print(f'Reversed: {immediate}')
                     # print(f'Recombined: {imm_12}-{imm_11}-{imm_10_5}-{imm_4_1}')
@@ -447,6 +452,7 @@ addi x0, x0, 0
             row_to_return['pending_jump'] = pending_jump_name_temp
             row_to_return['address'] = address
             row_to_return['instruction'] = instruction
+            row_to_return['line_number'] = self.line_counter
 
             self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
@@ -475,7 +481,7 @@ addi x0, x0, 0
                 # Get current address to place variable
                 address = self.current_data_segment
                 # Increment by 4 the current address and pad with zeroes until 32 bits
-                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#014b') 
+                self.current_data_segment = format(int(address, 2) + int ('100', 2), '#014b')
 
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address
@@ -492,17 +498,17 @@ addi x0, x0, 0
 
             #Returns false if jump instrution already in the table
             elif instruction == 'jump':
-                
+
                 jump_inst = matched_string[1]
 
                 if jump_inst in self.jump_instructions.keys(): return False
 
-                address = self.current_text_segment              
+                address = self.current_text_segment
                 self.jump_instructions[jump_inst] = address
 
                 # Commented out, jump doesn't need to be added as a intruction
                 # self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
-                
+
                 return True
 
     # Search if pending jumps are declared
@@ -517,9 +523,11 @@ addi x0, x0, 0
                 jump_inst = row['pending_jump']
 
                 if jump_inst not in self.jump_instructions.keys():
-                    raise Exception(f"Error: {jump_inst} was never declared.")
+                    # raise Exception(f"Error: {jump_inst} was never declared.")
+                    msg = f"Line: {row['line_number']}, Error: {jump_inst} was never declared."
+                    return msg
 
-                # Offset =  (jump instruction address - current address) / 2   
+                # Offset =  (jump instruction address - current address) / 2
                 immediate = (int(self.jump_instructions[jump_inst], 2) - int(row['address'], 2)) // 2
 
                 original_binary = bin(immediate & 0xfff)[2:]
@@ -561,6 +569,7 @@ addi x0, x0, 0
                     '14-12': row['14-12'],
                     '11-7': eleven_to_seven,
                     '6-0': row['6-0'],
+                    'line_number': row['line_number'],
                     'pending_jump': None,
                     'pending_variable': row['pending_variable']
                 }
@@ -576,7 +585,11 @@ addi x0, x0, 0
                     print("Before update:")
                     self.print_formatted_table()
 
-                self.binary_table_df.at[index] = row_to_return
+                # New way of updating
+                self.binary_table_df.at[index, "31-25"] = thirtyone_to_twentyfive
+                self.binary_table_df.at[index, "11-7"] = eleven_to_seven
+                self.binary_table_df.at[index, "pending_jump"] = None
+
 
                 if self.test:
                     print("After update:")
@@ -584,6 +597,7 @@ addi x0, x0, 0
                     print("#" * 100)
                     print("END UPDATE FUNCTION")
                     print("#" * 100)
+
 
     # Search if pending variables are declared
     def populate_pending_variables(self):
@@ -600,7 +614,9 @@ addi x0, x0, 0
                 if variable_name in self.variables.keys():
                     immediate = self.variables[variable_name]['address']
                 else:
-                    raise Exception(f"Error: {variable_name} was never declared.")
+                    msg = f"Line: {row['line_number']}, Error: {variable_name} was never declared."
+                    return msg
+                    # raise Exception(f"Error: {variable_name} was never declared.")
 
                 immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
 
@@ -628,7 +644,8 @@ addi x0, x0, 0
                     '11-7': eleven_to_seven,
                     '6-0': row['6-0'],
                     'pending_jump': row['pending_jump'],
-                    'pending_variable': None
+                    'pending_variable': None,
+                    'line_number': row['line_number']
                 }
 
                 if self.test:
@@ -651,7 +668,7 @@ addi x0, x0, 0
                     print("#" * 100)
 
     # Gets the string from the edit text box
-    def evaluate(self): 
+    def evaluate(self):
 
         #Get lines from text field
         string_to_eval = self.edit_text.get("1.0", "end")
@@ -679,14 +696,14 @@ addi x0, x0, 0
 
             if formatted_command == '': # Skip if empty line
                 self.line_counter += 1
-                continue 
+                continue
 
             # print(f"Command to match regex: {command}")
             for key, command in self.commands_dict.items():
                 match_regex = re.match(command['regex'], formatted_command)
 
                 if match_regex:
-                    
+
                     if self.is_text:
                         row_to_add = self.parse_instruction(key, match_regex.groups(), True)
                         self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
@@ -700,7 +717,7 @@ addi x0, x0, 0
 
             # If no commands matched, check if it's a reserved word command
             if not match_found:
-                
+
                 # Key is the regex type
                 for key, regex in reserved_list.items():
                     match_regex = re.match(regex, formatted_command)
@@ -718,7 +735,7 @@ addi x0, x0, 0
                         elif key in ['data', 'text']:
                             row_to_add = self.parse_instruction(key, match_regex.groups(), False)
                             if self.test: msg = match_regex.groups()
-                        
+
                         elif key == 'variable':
                             if self.is_data:
                                 result = self.parse_instruction(key, match_regex.groups(), False)
@@ -732,14 +749,14 @@ addi x0, x0, 0
 
             if not self.test:
 
-                if not match_regex: 
+                if not match_regex:
                     msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
 
                 if msg != None:
                     self.print_in_terminal(msg)
                     parsing_passed = False
                     break
-                
+
             else:
                 if not match_regex:
                     msg = f'Line: {self.line_counter}, Error: Incorrect Syntax.'
@@ -748,14 +765,28 @@ addi x0, x0, 0
 
             self.line_counter += 1
 
+        # Populate pending jumps
+        has_error = self.populate_pending_jumps()
+        if has_error:
+            self.print_in_terminal(has_error)
+            parsing_passed = False
+
+        # Populate pending variables
+        has_error = self.populate_pending_variables()
+        if has_error:
+            self.print_in_terminal(has_error)
+            parsing_passed = False
+
+
         if parsing_passed:
             if self.test:
                 self.print_in_terminal(results)
 
-            self.populate_pending_jumps()
-            self.populate_pending_variables()
+            self.print_formatted_table()
 
-            if not self.test: 
+
+
+            if not self.test:
                 self.print_in_terminal('Success in parsing.\n')
 
             print('=' * 100)

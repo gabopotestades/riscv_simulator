@@ -103,34 +103,49 @@ class Main(tk.Frame):
 #         """
 
 
-        sample_input =  """.data
-var1: .word 0x0f
-var2: .word 15
-.text
-addi x3, x31, 0x0ff
-addi x3, x4, 0x0ff
-addi x3, x5, 255
-beq x0, x02, jumper
-lw x1, +15
-lw x1, var1
-lw x1, 0(x15)
-lw x1, -15(x0)
-lw x1, 0xf
-lw x6, var5
-jumper:
-lw x1, -2
-sw x1, -2
-sw x2, var2
-sw x3, 0xc
-.data
-var4: .word 33
-var5: .word 0x21
-.text
-add x3, x4, x7
-addi x6, x23, -2
-slti x3, x4, 0x5
-"""
+#         sample_input =  """.data
+# var1: .word 0x0f
+# var2: .word 15
+# .text
+# addi x3, x31, 0x0ff
+# addi x3, x4, 0x0ff
+# addi x3, x5, 255
+# beq x0, x02, jumper
+# lw x1, +15
+# lw x1, var1
+# lw x1, 0(x15)
+# lw x1, -15(x0)
+# lw x1, 0xf
+# lw x6, var5
+# jumper:
+# lw x1, -2
+# sw x1, -2
+# sw x2, var2
+# sw x3, 0xc
+# .data
+# var4: .word 33
+# var5: .word 0x21
+# .text
+# add x3, x4, x7
+# addi x6, x23, -2
+# slti x3, x4, 0x5
+# """
 
+        sample_input =  """
+.data
+.text
+addi x5, x0, 8
+addi x6, x0, 4
+BLT x5, x6, L1
+xor x7, x5, x6
+and x8, x5, x6
+beq x0, x0, FIN
+L1: 
+sll x7, x5, x6
+srl x8, x5, x6
+FIN: 
+addi x0, x0, 0
+"""
         self.edit_text.insert(1.0, sample_input)
         self.edit_text.pack(fill="x")
 
@@ -352,7 +367,7 @@ slti x3, x4, 0x5
 
                     # Get the 4 parts of the immediate value
                     imm_12 = immediate[11]
-                    imm_10_5 = immediate[5:10][::-1]
+                    imm_10_5 = immediate[5:11][::-1]
                     imm_4_1 = immediate[0:5][::-1]
                     imm_11 = immediate[10]
 
@@ -366,9 +381,9 @@ slti x3, x4, 0x5
                     # print(f'Checking: {checking_result}')
 
                     # rd
-                    eleven_to_seven = int(imm_4_1 + imm_11, 2)
+                    eleven_to_seven = int(f'{imm_4_1}{imm_11}', 2)
                     # funct7
-                    thirtyone_to_twentyfive = int(imm_12 + imm_10_5, 2)
+                    thirtyone_to_twentyfive = int(f'{imm_12}{imm_10_5}', 2)
 
                 else:
 
@@ -504,8 +519,8 @@ slti x3, x4, 0x5
                 if jump_inst not in self.jump_instructions.keys():
                     raise Exception(f"Error: {jump_inst} was never declared.")
 
-                # Offset =  current address divided by 2 - jump instruction address  (swapped, basis is sb_type function)
-                immediate = (int(row['address'], 2) - int(self.jump_instructions[jump_inst], 2)) // 2
+                # Offset =  (jump instruction address - current address) / 2   
+                immediate = (int(self.jump_instructions[jump_inst], 2) - int(row['address'], 2)) // 2
 
                 original_binary = bin(immediate & 0xfff)[2:]
 
@@ -516,7 +531,7 @@ slti x3, x4, 0x5
 
                 # Get the 4 parts of the immediate value
                 imm_12 = immediate[11]
-                imm_10_5 = immediate[5:10][::-1]
+                imm_10_5 = immediate[5:11][::-1]
                 imm_4_1 = immediate[0:5][::-1]
                 imm_11 = immediate[10]
 

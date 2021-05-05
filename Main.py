@@ -133,6 +133,8 @@ class Main(tk.Frame):
 
         sample_input =  """
 .data
+var1: .word 6
+x: .word 0x0ff
 .text
 addi x5, x0, 8
 addi x6, x0, 4

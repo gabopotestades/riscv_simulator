@@ -1,21 +1,23 @@
 import re
 import sys
 import tkinter as tk
-from tkinter import Label, Button, Text, CENTER, INSERT, END
+from tkinter import Label, Button, Text, CENTER, INSERT, END, Listbox
 import pandas as pd
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
-pd.set_option('display.max_colwidth', -1)
-
+# pd.set_option('display.max_colwidth', -1)
+from tksheet import Sheet
 class Main(tk.Frame):
 
     # Initialize the screen
     def __init__(self, master, commands_dict, reserved_list, test_flag):
         self.master = master
         self.master.title("RISC-V Simulator")
-        self.master.geometry('600x650')
-        self.master.config(bg = 'black')
+        self.master.geometry('1000x900')
+        # self.master.attributes('-fullscreen', True)
+
+        self.master.config(bg = 'darkgray')
         self.test = test_flag # Boolean for testing outputs
         self.is_data = False
         self.is_text = False
@@ -23,6 +25,7 @@ class Main(tk.Frame):
 
         self.edit_text = None
         self.terminal_text = None
+        self.registers_table = None
 
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
@@ -39,15 +42,43 @@ class Main(tk.Frame):
 
     # Create the objects in the screen
     def create_widgets(self):
-        menu_evaluate = Button(self.master, text="Assemble", command=self.evaluate, bg="lightgreen", fg="black")
-        menu_evaluate.pack(fill="x")
+        self.master.grid_columnconfigure(0, weight=1)
+        self.master.grid_rowconfigure(0, weight=1)
 
-        step_one_label = Label(self.master, text="INSTRUCTIONS",  background="grey", foreground="white")
-        step_one_label.config(anchor=CENTER)
-        step_one_label.pack(fill="x")
 
-        self.edit_text = Text(self.master, background="black", foreground="white", insertbackground='white', height=30)
-        self.edit_text.pack(fill="x")
+        assemble_button = Button(self.master, text="Assemble", command=self.evaluate, bg="green", fg="white", highlightbackground='#008000')
+        # assemble_button.pack(fill="x")
+        assemble_button.grid(row=0, column=0,  sticky='nswe')
+
+        editor_label = Label(self.master, text="EDITOR",  background="grey", foreground="white")
+        editor_label.config(anchor=CENTER)
+        editor_label.grid(row=1, column=0, sticky='nswe')
+
+
+        register_label = Label(self.master, text="REGISTERS",  background="black", foreground="white")
+        register_label.config(anchor=CENTER)
+        register_label.grid(row=1, column=3, sticky='nswe')
+
+
+        self.edit_text = Text(self.master, background="white", foreground="black", insertbackground='black', height=20,
+                              font=("Calibri", 15))
+        # self.edit_text.pack(side=tk.LEFT, fill="both", expand=False)
+        self.edit_text.grid(row=2, column=0, columnspan=3,  sticky='nswe')
+
+
+
+        sheet = Sheet(self.master,
+                      show_row_index=False,
+                      show_header=False,
+                      header_height="0",
+                      row_index_width=0,
+                      show_y_scrollbar=False,
+                      show_x_scrollbar=False,
+                      data=[[f"x{r}" if c == 0 else "0" for c in range(2)] for r in range(32)])
+        sheet.enable_bindings()
+        sheet.grid(row=2, column=3, sticky="nswe")
+
+
 
         # Sample input for reserved words
 #         sample_input = """.data
@@ -149,15 +180,15 @@ FIN:
 addi x0, x0, 0
 """
         self.edit_text.insert(1.0, sample_input)
-        self.edit_text.pack(fill="x")
+        # self.edit_text.grid(row=4)
 
-        step_three_label = Label(self.master, text="MESSAGE",  background="grey", foreground="white")
-        step_three_label.config(anchor=CENTER)
-        step_three_label.pack(fill="x")
+        console_log_label = Label(self.master, text="CONSOLE LOG",  background="black", foreground="white")
+        console_log_label.config(anchor=CENTER)
+        console_log_label.grid(row=5, sticky = 'nswe', columnspan=4)
 
-        self.terminal_text = Text(self.master, background="black", foreground="green", height=10)
+        self.terminal_text = Text(self.master, background="black", foreground="green", height=20, font=("Consolas", 14))
         self.terminal_text.config()
-        self.terminal_text.pack(fill="x")
+        self.terminal_text.grid(row=6, columnspan=4, sticky='nswe')
 
 
     def print_jump_intructions(self):

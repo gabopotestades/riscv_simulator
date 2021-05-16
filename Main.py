@@ -1,23 +1,25 @@
 import re
 import sys
 import tkinter as tk
-from tkinter import Label, Button, Text, CENTER, INSERT, END, Listbox
+from tkinter import Label, Button, Text, CENTER, INSERT, END
+from tksheet import Sheet
 import pandas as pd
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 # pd.set_option('display.max_colwidth', -1)
-from tksheet import Sheet
+
 class Main(tk.Frame):
 
     # Initialize the screen
-    def __init__(self, master, commands_dict, reserved_list, test_flag):
+    def __init__(self, master, commands_dict, reserved_list, sample_input, test_flag):
         self.master = master
         self.master.title("RISC-V Simulator")
         self.master.geometry('1400x900')
         # self.master.attributes('-fullscreen', True)
 
         self.master.config(bg = 'darkgray')
+        self.sample_input = sample_input
         self.test = test_flag # Boolean for testing outputs
         self.is_data = False
         self.is_text = False
@@ -133,7 +135,6 @@ class Main(tk.Frame):
         self.text_segment_table=None
         self.create_widgets()
 
-
     def repopulate_register_ui(self):
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
 
@@ -219,7 +220,6 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
 
-    # Create the objects in the screen
     def create_widgets(self):
         # self.master.grid_columnconfigure(0, weight=1)
         # self.master.grid_rowconfigure(0, weight=1)
@@ -273,109 +273,7 @@ class Main(tk.Frame):
         self.registers_table.readonly_columns(columns=[0], readonly=True, redraw=True)
         self.registers_table.grid(row=2,  column=second_col, columnspan=1, sticky="nswe")
 
-
-
-
-        # Sample input for reserved words
-#         sample_input = """.data
-# var1: .word 0x0f
-# var2: .word 2
-# var3: .word 0x08
-
-# .text
-# jump:
-
-# """
-
-        # Sample input for r-type
-#         sample_input = """.text
-# add x0, x1, x2
-# and x3, x4, x5
-# or x6, x7, x8
-# xor x9, x10, x11
-# slt x12, x13, x14
-# srl x15, x16, x17
-# sll x18, x19, x20
-# """
-
-        # Sample input for i-type
-#         sample_input = """.text
-# addi x0, x1, 0x2
-# slti x3, x4, 0x5
-# slli x6, x7, 4
-# srli x9, x10, 34543
-# andi x12, x13, 0xfff
-# ori x15, x22, 234
-# xori x31, x19, 0xabcdef
-# """
-
-        # Sample input for s-type
-#         sample_input = """.text
-# lw x6, 0(x8)
-# sw x10, (x9)
-# """
-
-
-        # Sample input for sb-type
-#         sample_input = """.data
-# var1: .word 1
-# .text
-# lw x9, var1
-# lw x10, var2
-# beq x9, x10, jumper
-# jumper:
-# lw x0, var1
-# .data
-# var2: .word 2
-#         """
-
-
-#         sample_input =  """.data
-# var1: .word 0x0f
-# var2: .word 15
-# .text
-# addi x3, x31, 0x0ff
-# addi x3, x4, 0x0ff
-# addi x3, x5, 255
-# beq x0, x02, jumper
-# lw x1, +15
-# lw x1, var1
-# lw x1, 0(x15)
-# lw x1, -15(x0)
-# lw x1, 0xf
-# lw x6, var5
-# jumper:
-# lw x1, -2
-# sw x1, -2
-# sw x2, var2
-# sw x3, 0xc
-# .data
-# var4: .word 33
-# var5: .word 0x21
-# .text
-# add x3, x4, x7
-# addi x6, x23, -2
-# slti x3, x4, 0x5
-# """
-
-        sample_input =  """
-.data
-var1: .word 6
-x: .word 0x0ff
-.text
-addi x5, x0, 8
-addi x6, x0, 4
-BLT x5, x6, L1
-xor x7, x5, x6
-and x8, x5, x6
-beq x0, x0, FIN
-L1: 
-sll x7, x5, x6
-srl x8, x5, x6
-FIN: 
-addi x0, x0, 0
-"""
-        self.edit_text.insert(1.0, sample_input)
+        self.edit_text.insert(1.0, self.sample_input)
         # self.edit_text.grid(row=4)
 
         console_log_label = Label(self.master, text="CONSOLE LOG",  background="black", foreground="white")
@@ -475,7 +373,6 @@ addi x0, x0, 0
         self.repopulate_data_segment_ui()
         self.repopulate_text_segment_ui()
         self.repopulate_pipeline_ui()
-
 
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
@@ -916,7 +813,6 @@ addi x0, x0, 0
                     print("END UPDATE FUNCTION")
                     print("#" * 100)
 
-
     # Search if pending variables are declared
     def populate_pending_variables(self):
 
@@ -1119,10 +1015,13 @@ addi x0, x0, 0
             self.print_formatted_table()
             print('=' * 100)
 
+    def execute(self):
+        pass
+
+
 if __name__ == "__main__":
 
-    # Bawal to, check if it passes
-    # add x6, x6, x8
+    # region Declarables
 
     reserved_list = {
         # reserved word
@@ -1259,6 +1158,108 @@ if __name__ == "__main__":
         }
     }
 
+
+#         sample_input = """.data
+# var1: .word 0x0f
+# var2: .word 2
+# var3: .word 0x08
+
+# .text
+# jump:
+
+# """
+
+        # Sample input for r-type
+#         sample_input = """.text
+# add x0, x1, x2
+# and x3, x4, x5
+# or x6, x7, x8
+# xor x9, x10, x11
+# slt x12, x13, x14
+# srl x15, x16, x17
+# sll x18, x19, x20
+# """
+
+        # Sample input for i-type
+#         sample_input = """.text
+# addi x0, x1, 0x2
+# slti x3, x4, 0x5
+# slli x6, x7, 4
+# srli x9, x10, 34543
+# andi x12, x13, 0xfff
+# ori x15, x22, 234
+# xori x31, x19, 0xabcdef
+# """
+
+        # Sample input for s-type
+#         sample_input = """.text
+# lw x6, 0(x8)
+# sw x10, (x9)
+# """
+
+
+        # Sample input for sb-type
+#         sample_input = """.data
+# var1: .word 1
+# .text
+# lw x9, var1
+# lw x10, var2
+# beq x9, x10, jumper
+# jumper:
+# lw x0, var1
+# .data
+# var2: .word 2
+#         """
+
+
+#         sample_input =  """.data
+# var1: .word 0x0f
+# var2: .word 15
+# .text
+# addi x3, x31, 0x0ff
+# addi x3, x4, 0x0ff
+# addi x3, x5, 255
+# beq x0, x02, jumper
+# lw x1, +15
+# lw x1, var1
+# lw x1, 0(x15)
+# lw x1, -15(x0)
+# lw x1, 0xf
+# lw x6, var5
+# jumper:
+# lw x1, -2
+# sw x1, -2
+# sw x2, var2
+# sw x3, 0xc
+# .data
+# var4: .word 33
+# var5: .word 0x21
+# .text
+# add x3, x4, x7
+# addi x6, x23, -2
+# slti x3, x4, 0x5
+# """
+
+    sample_input =  """
+.data
+var1: .word 6
+x: .word 0x0ff
+.text
+addi x5, x0, 8
+addi x6, x0, 4
+BLT x5, x6, L1
+xor x7, x5, x6
+and x8, x5, x6
+beq x0, x0, FIN
+L1: 
+sll x7, x5, x6
+srl x8, x5, x6
+FIN: 
+addi x0, x0, 0
+"""
+
+    # endregion Declarables
+
     root = tk.Tk()
-    app = Main(root, commands_dict, reserved_list, False)
+    app = Main(root, commands_dict, reserved_list, sample_input, False)
     root.mainloop()

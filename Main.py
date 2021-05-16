@@ -133,6 +133,8 @@ class Main(tk.Frame):
 
         sample_input =  """
 .data
+var1: .word 6
+x: .word 0x0ff
 .text
 addi x5, x0, 8
 addi x6, x0, 4
@@ -523,7 +525,7 @@ addi x0, x0, 0
 
                 if jump_inst not in self.jump_instructions.keys():
                     # raise Exception(f"Error: {jump_inst} was never declared.")
-                    msg = f"Line: {row['line_number']}, Error: {jump_inst} was never declared."
+                    msg = f"Line: {int(row['line_number'])}, Error: {jump_inst} was never declared."
                     return msg
 
                 # Offset =  (jump instruction address - current address) / 2
@@ -613,7 +615,7 @@ addi x0, x0, 0
                 if variable_name in self.variables.keys():
                     immediate = self.variables[variable_name]['address']
                 else:
-                    msg = f"Line: {row['line_number']}, Error: {variable_name} was never declared."
+                    msg = f"Line: {int(row['line_number'])}, Error: {variable_name} was never declared."
                     return msg
                     # raise Exception(f"Error: {variable_name} was never declared.")
 
@@ -764,17 +766,18 @@ addi x0, x0, 0
 
             self.line_counter += 1
 
-        # Populate pending jumps
-        has_error = self.populate_pending_jumps()
-        if has_error:
-            self.print_in_terminal(has_error)
-            parsing_passed = False
+        if parsing_passed:
+            # Populate pending jumps
+            has_error = self.populate_pending_jumps()
+            if has_error:
+                self.print_in_terminal(has_error)
+                parsing_passed = False
 
-        # Populate pending variables
-        has_error = self.populate_pending_variables()
-        if has_error:
-            self.print_in_terminal(has_error)
-            parsing_passed = False
+            # Populate pending variables
+            has_error = self.populate_pending_variables()
+            if has_error:
+                self.print_in_terminal(has_error)
+                parsing_passed = False
 
 
         if parsing_passed:

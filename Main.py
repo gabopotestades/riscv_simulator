@@ -427,7 +427,7 @@ class Main(tk.Frame):
             self.terminal_text.config(state="disabled")
 
     # Get return row on parsing of matched line
-    def parse_instruction(self, instruction, matched_string, is_command):
+    def parse_instruction(self, instruction, matched_string, actual_instruction, is_command):
 
         # If is_command is True, convert the command to opcode
         if is_command:
@@ -675,6 +675,20 @@ class Main(tk.Frame):
             row_to_return['instruction'] = instruction
 
             row_to_return['line_number'] = self.line_counter
+            row_to_return['actual_command'] = actual_instruction
+
+            # Split the actual instruction's parameters into 3
+            splitted_actual_instruction = [x.replace(",", "") for x in actual_instruction.split(" ")]
+
+
+            row_to_return['rd'] = splitted_actual_instruction[1]
+            row_to_return['rs1'] = splitted_actual_instruction[2]
+
+            # Check if rs2 exists
+            if len(splitted_actual_instruction) >= 4:
+                row_to_return['rs2'] = splitted_actual_instruction[3]
+            else:
+                row_to_return['rs2'] = ""
 
             self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
@@ -994,7 +1008,7 @@ class Main(tk.Frame):
                 if match_regex:
 
                     if self.is_text:
-                        row_to_add = self.parse_instruction(key, match_regex.groups(), True)
+                        row_to_add = self.parse_instruction(key, match_regex.groups(), formatted_command, True)
                         self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
                         if self.test: msg = match_regex.groups()
                     else:
@@ -1015,19 +1029,19 @@ class Main(tk.Frame):
 
                         if key == 'jump':
                             if self.is_text:
-                                result = self.parse_instruction(key, match_regex.groups(), False)
+                                result = self.parse_instruction(key, match_regex.groups(), formatted_command, False)
                                 if not result:
                                     msg = f"Line: {self.line_counter}, Error: Instruction '{match_regex[1]}' is already defined."
                             else:
                                 msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
 
                         elif key in ['data', 'text']:
-                            row_to_add = self.parse_instruction(key, match_regex.groups(), False)
+                            row_to_add = self.parse_instruction(key, match_regex.groups(), formatted_command, False)
                             if self.test: msg = match_regex.groups()
 
                         elif key == 'variable':
                             if self.is_data:
-                                result = self.parse_instruction(key, match_regex.groups(), False)
+                                result = self.parse_instruction(key, match_regex.groups(), formatted_command, False)
                                 if result:
                                     if self.test: msg = match_regex.groups()
                                 else:

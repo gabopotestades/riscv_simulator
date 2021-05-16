@@ -1,4 +1,4 @@
-import re
+`import re
 import sys
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END, Listbox
@@ -14,7 +14,7 @@ class Main(tk.Frame):
     def __init__(self, master, commands_dict, reserved_list, test_flag):
         self.master = master
         self.master.title("RISC-V Simulator")
-        self.master.geometry('1000x900')
+        self.master.geometry('1400x900')
         # self.master.attributes('-fullscreen', True)
 
         self.master.config(bg = 'darkgray')
@@ -22,10 +22,42 @@ class Main(tk.Frame):
         self.is_data = False
         self.is_text = False
         self.line_counter = 1
-
         self.edit_text = None
         self.terminal_text = None
-        self.registers_table = None
+        self.registers_dict = {
+            "x0": {"is_editable": False, "value": 0},
+            "x1": {"is_editable": True, "value": 100},
+            "x2": {"is_editable": True, "value": 100101},
+            "x3": {"is_editable": True, "value": 0},
+            "x4": {"is_editable": True, "value": 0},
+            "x5": {"is_editable": True, "value": 0},
+            "x6": {"is_editable": True, "value": 0},
+            "x7": {"is_editable": True, "value": 0},
+            "x8": {"is_editable": True, "value": 0},
+            "x9": {"is_editable": True, "value": 0},
+            "x10": {"is_editable": True, "value": 0},
+            "x11": {"is_editable": True, "value": 0},
+            "x12": {"is_editable": True, "value": 0},
+            "x13": {"is_editable": True, "value": 0},
+            "x14": {"is_editable": True, "value": 0},
+            "x15": {"is_editable": True, "value": 0},
+            "x16": {"is_editable": True, "value": 0},
+            "x17": {"is_editable": True, "value": 0},
+            "x18": {"is_editable": True, "value": 0},
+            "x19": {"is_editable": True, "value": 0},
+            "x20": {"is_editable": True, "value": 0},
+            "x21": {"is_editable": True, "value": 0},
+            "x22": {"is_editable": True, "value": 0},
+            "x23": {"is_editable": True, "value": 0},
+            "x24": {"is_editable": True, "value": 0},
+            "x25": {"is_editable": True, "value": 0},
+            "x26": {"is_editable": True, "value": 0},
+            "x27": {"is_editable": True, "value": 0},
+            "x28": {"is_editable": True, "value": 0},
+            "x29": {"is_editable": True, "value": 0},
+            "x30": {"is_editable": True, "value": 0},
+            "x31": {"is_editable": True, "value": 0}
+        }
 
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
@@ -37,11 +69,34 @@ class Main(tk.Frame):
         self.current_text_segment = None
 
         self.binary_table_df = None
+
+        self.registers_table = None
+        self.pipeline_map_table = None
+
+
         self.create_widgets()
 
 
+    def repopulate_register_ui(self):
+        # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
+
+        list_version_of_register_dict = []
+        for register, value in self.registers_dict.items():
+            list_version_of_register_dict += [[register, value['value']]]
+
+        self.registers_table.set_sheet_data(data=list_version_of_register_dict,
+                       reset_col_positions=True,
+                       reset_row_positions=True,
+                       redraw=True,
+                       verify=False,
+                       reset_highlights=False)
+
+        # self.registers_table.set_row_data(r=0, values=tuple(1,2,3,4), add_columns=True, redraw=False)
+
     # Create the objects in the screen
     def create_widgets(self):
+
+
         self.master.grid_columnconfigure(0, weight=1)
         self.master.grid_rowconfigure(0, weight=1)
 
@@ -54,29 +109,29 @@ class Main(tk.Frame):
         editor_label.config(anchor=CENTER)
         editor_label.grid(row=1, column=0, sticky='nswe')
 
-
-        register_label = Label(self.master, text="REGISTERS",  background="black", foreground="white")
+        register_label = Label(self.master, text="REGISTERS",  background="darkblue", foreground="white")
         register_label.config(anchor=CENTER)
-        register_label.grid(row=1, column=3, sticky='nswe')
-
+        register_label.grid(row=1, column=2, sticky='nswe')
 
         self.edit_text = Text(self.master, background="white", foreground="black", insertbackground='black', height=20,
                               font=("Calibri", 15))
-        # self.edit_text.pack(side=tk.LEFT, fill="both", expand=False)
-        self.edit_text.grid(row=2, column=0, columnspan=3,  sticky='nswe')
+
+        self.edit_text.grid(row=2, column=0, columnspan=1, sticky='nswe')
+
+        self.registers_table = Sheet(self.master,
+                                     show_row_index=False,
+                                     show_header=False,
+                                     header_height="0",
+                                     row_index_width=0,
+                                     show_y_scrollbar=False,
+                                     show_x_scrollbar=False,
+                                     data=[[f"x{r}" if c == 0 else "0" for c in range(2)] for r in range(32)])
 
 
+        self.registers_table.enable_bindings()
+        self.registers_table.readonly_columns(columns=[0], readonly=True, redraw=True)
+        self.registers_table.grid(row=2, column=2, sticky="nswe")
 
-        sheet = Sheet(self.master,
-                      show_row_index=False,
-                      show_header=False,
-                      header_height="0",
-                      row_index_width=0,
-                      show_y_scrollbar=False,
-                      show_x_scrollbar=False,
-                      data=[[f"x{r}" if c == 0 else "0" for c in range(2)] for r in range(32)])
-        sheet.enable_bindings()
-        sheet.grid(row=2, column=3, sticky="nswe")
 
 
 
@@ -184,13 +239,33 @@ addi x0, x0, 0
 
         console_log_label = Label(self.master, text="CONSOLE LOG",  background="black", foreground="white")
         console_log_label.config(anchor=CENTER)
-        console_log_label.grid(row=5, sticky = 'nswe', columnspan=4)
+        console_log_label.grid(row=5, sticky = 'nswe', columnspan=2)
 
         self.terminal_text = Text(self.master, background="black", foreground="green", height=20, font=("Consolas", 14))
         self.terminal_text.config()
-        self.terminal_text.grid(row=6, columnspan=4, sticky='nswe')
+        self.terminal_text.grid(row=6, column=0, columnspan=1, sticky='nswe')
 
 
+
+        pipeline_map_label = Label(self.master, text="PIPELINE MAP",  background="darkORANGE", foreground="white")
+        pipeline_map_label.config(anchor=CENTER)
+        pipeline_map_label.grid(row=5, column=1, columnspan=4, sticky='nswe')
+
+        self.pipeline_map_table = Sheet(self.master,
+                                     show_row_index=False,
+                                     show_header=False,
+                                     header_height="0",
+                                     row_index_width=0,
+                                     show_y_scrollbar=False,
+                                     show_x_scrollbar=False,
+                                     data=[[f"Command {r}" if c == 0 else "0" for c in range(10)] for r in range(10)])
+        self.pipeline_map_table.enable_bindings()
+        self.pipeline_map_table.grid(row=6, column=1, columnspan=4, sticky="nswe")
+
+
+
+
+        self.repopulate_register_ui()
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
             print(f'{key}: {value}')
@@ -976,3 +1051,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = Main(root, commands_dict, reserved_list, False)
     root.mainloop()
+`

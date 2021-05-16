@@ -1,4 +1,4 @@
-`import re
+import re
 import sys
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END, Listbox
@@ -24,6 +24,29 @@ class Main(tk.Frame):
         self.line_counter = 1
         self.edit_text = None
         self.terminal_text = None
+        self.internal_registers_dict = {
+            "IF/ID.IR": {"value": 0},
+            "IF/ID.NPC": {"value": 0},
+            "PC": {"value": 0},
+
+            "ID/EX.A": {"value": 0},
+            "ID/EX.B": {"value": 0},
+            "ID/EX.IMM": {"value": 0},
+            "ID/EX.IR": {"value": 0},
+            "ID/EX.NPC": {"value": 0},
+
+            "EX/MEM.ALUOUTPUT": {"value": 0},
+            "EX/MEM.cond": {"value": 0},
+            "EX/MEM.IR": {"value": 0},
+            "EX/MEM.B": {"value": 0},
+
+            "MEM/WB.LMD": {"value": 0},
+            "MEM/WB.IR": {"value": 0},
+            "MEM/WB.ALUOUTPUT": {"value": 0},
+            "MEM/MEMORY AFFECTED": {"value": 0},
+            "WB/REGISTERS AFFECTED": {"value": 0}
+        }
+
         self.registers_dict = {
             "x0": {"is_editable": False, "value": 0},
             "x1": {"is_editable": True, "value": 100},
@@ -59,6 +82,38 @@ class Main(tk.Frame):
             "x31": {"is_editable": True, "value": 0}
         }
 
+
+        self.data_segment_dict = {
+            "000007FF": 0
+        }
+
+
+        self.text_segment_dict = {
+            "10001FFF": 0
+        }
+
+        self.labels_dict = {
+
+        }
+        self.pipeline_map_df = pd.DataFrame(
+                                [{'Instruction': 'addi x, y, z',
+                                  'Cycle 1': "IF",
+                                  'Cycle 2': "ID",
+                                  'Cycle 3': "EX",
+                                  'Cycle 4': "ME",
+                                  'Cycle 5': "WB",
+                                  'Cycle 6': ""
+                                  },
+                                 {'Instruction': 'subi x, y, z',
+                                  'Cycle 1': "",
+                                  'Cycle 2': "IF",
+                                  'Cycle 3': "ID",
+                                  'Cycle 4': "EX",
+                                  'Cycle 5': "ME",
+                                  'Cycle 6': "WB",
+                                  }
+                               ])
+
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
 
@@ -72,8 +127,10 @@ class Main(tk.Frame):
 
         self.registers_table = None
         self.pipeline_map_table = None
-
-
+        self.internal_registers_table=None
+        self.labels_table=None
+        self.data_segment_table=None
+        self.text_segment_table=None
         self.create_widgets()
 
 
@@ -91,46 +148,130 @@ class Main(tk.Frame):
                        verify=False,
                        reset_highlights=False)
 
-        # self.registers_table.set_row_data(r=0, values=tuple(1,2,3,4), add_columns=True, redraw=False)
+    def repopulate_internal_register_ui(self):
+        list_version_of_internal_registers_dict = []
+        for internal_register, value in self.internal_registers_dict.items():
+            list_version_of_internal_registers_dict += [[internal_register, value['value']]]
+
+        self.internal_registers_table.set_sheet_data(data=list_version_of_internal_registers_dict,
+                                            reset_col_positions=True,
+                                            reset_row_positions=True,
+                                            redraw=True,
+                                            verify=False,
+                                            reset_highlights=False)
+
+    def repopulate_data_segment_ui(self):
+        list_version_of_data_segment_dict = []
+        for address, value in self.data_segment_dict.items():
+            list_version_of_data_segment_dict += [[address, value]]
+
+        self.data_segment_table.set_sheet_data(data=list_version_of_data_segment_dict,
+                                                     reset_col_positions=True,
+                                                     reset_row_positions=True,
+                                                     redraw=True,
+                                                     verify=False,
+                                                     reset_highlights=False)
+
+    def repopulate_text_segment_ui(self):
+        list_version_of_text_segment_dict = []
+        for address, value in self.text_segment_dict.items():
+            list_version_of_text_segment_dict += [[address, value]]
+
+        self.text_segment_table.set_sheet_data(data=list_version_of_text_segment_dict,
+                                               reset_col_positions=True,
+                                               reset_row_positions=True,
+                                               redraw=True,
+                                               verify=False,
+                                               reset_highlights=False)
+
+    def repopulate_labels_ui(self):
+        list_version_of_labels_dict = []
+        for label, value in self.labels_dict.items():
+            list_version_of_labels_dict += [[label, value]]
+
+        self.text_segment_table.set_sheet_data(data=list_version_of_labels_dict,
+                                               reset_col_positions=True,
+                                               reset_row_positions=True,
+                                               redraw=True,
+                                               verify=False,
+                                               reset_highlights=False)
+
+    def repopulate_pipeline_ui(self):
+        list_version_of_pipeline_df= []
+        # for label, value in self.labels_dict.items():
+        #     list_version_of_pipeline_df += [[label, value]]
+
+        list_version_of_pipeline_df = []
+
+        for x in range(self.pipeline_map_df.shape[0]):
+            list_version_of_pipeline_df += [self.pipeline_map_df.loc[x, :].values.tolist()]
+
+        list_of_clock_cycles = ['INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1])]
+
+        self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
+                                     reset_col_positions=False, show_headers_if_not_sheet=True)
+
+
+        self.pipeline_map_table.set_sheet_data(data=list_version_of_pipeline_df,
+                                               reset_col_positions=True,
+                                               reset_row_positions=True,
+                                               redraw=True,
+                                               verify=False,
+                                               reset_highlights=False)
 
     # Create the objects in the screen
     def create_widgets(self):
+        # self.master.grid_columnconfigure(0, weight=1)
+        # self.master.grid_rowconfigure(0, weight=1)
 
-
-        self.master.grid_columnconfigure(0, weight=1)
+        self.master.grid_columnconfigure(0, weight=1, uniform="group1")
+        self.master.grid_columnconfigure(1, weight=1, uniform="group1")
         self.master.grid_rowconfigure(0, weight=1)
 
+        first_col = 0
 
-        assemble_button = Button(self.master, text="Assemble", command=self.evaluate, bg="green", fg="white", highlightbackground='#008000')
+        second_col = 1
+
+        third_col = 2
+
+        fourth_col = 3
+
+        fifth_col = 4
+
+
+        assemble_button = Button(self.master, text="ASSEMBLE", command=self.evaluate, bg="green", fg="white", highlightbackground='#008000')
         # assemble_button.pack(fill="x")
-        assemble_button.grid(row=0, column=0,  sticky='nswe')
+        assemble_button.grid(row=0, column=first_col, columnspan=1, sticky='nswe')
 
-        editor_label = Label(self.master, text="EDITOR",  background="grey", foreground="white")
+        editor_label = Label(self.master, text="EDITOR",  background="darkblue", foreground="white")
         editor_label.config(anchor=CENTER)
-        editor_label.grid(row=1, column=0, sticky='nswe')
+        editor_label.grid(row=1, column=first_col, columnspan=1, sticky='nswe')
 
-        register_label = Label(self.master, text="REGISTERS",  background="darkblue", foreground="white")
-        register_label.config(anchor=CENTER)
-        register_label.grid(row=1, column=2, sticky='nswe')
 
         self.edit_text = Text(self.master, background="white", foreground="black", insertbackground='black', height=20,
                               font=("Calibri", 15))
 
-        self.edit_text.grid(row=2, column=0, columnspan=1, sticky='nswe')
+        self.edit_text.grid(row=2, column=first_col, columnspan=1, sticky='nswe')
+
+        register_label = Label(self.master, text="REGISTERS", background="#606060", foreground="white")
+        register_label.config(anchor=CENTER)
+        register_label.grid(row=1, column=second_col, columnspan=1, sticky='nswe')
 
         self.registers_table = Sheet(self.master,
                                      show_row_index=False,
-                                     show_header=False,
                                      header_height="0",
                                      row_index_width=0,
                                      show_y_scrollbar=False,
                                      show_x_scrollbar=False,
                                      data=[[f"x{r}" if c == 0 else "0" for c in range(2)] for r in range(32)])
 
+        self.registers_table.headers(newheaders=['REGISTER', 'VALUE'], index=None,
+                                     reset_col_positions=False, show_headers_if_not_sheet=True)
+
 
         self.registers_table.enable_bindings()
         self.registers_table.readonly_columns(columns=[0], readonly=True, redraw=True)
-        self.registers_table.grid(row=2, column=2, sticky="nswe")
+        self.registers_table.grid(row=2,  column=second_col, columnspan=1, sticky="nswe")
 
 
 
@@ -239,33 +380,103 @@ addi x0, x0, 0
 
         console_log_label = Label(self.master, text="CONSOLE LOG",  background="black", foreground="white")
         console_log_label.config(anchor=CENTER)
-        console_log_label.grid(row=5, sticky = 'nswe', columnspan=2)
+        console_log_label.grid(row=5, sticky='nswe', column=first_col, columnspan=1)
 
         self.terminal_text = Text(self.master, background="black", foreground="green", height=20, font=("Consolas", 14))
         self.terminal_text.config()
-        self.terminal_text.grid(row=6, column=0, columnspan=1, sticky='nswe')
+        self.terminal_text.grid(row=6, column=first_col, columnspan=1, sticky='nswe')
+
+        labels_label = Label(self.master, text="LABELS", background="#585858", foreground="white")
+        labels_label.config(anchor=CENTER)
+        labels_label.grid(row=1, column=third_col, columnspan=1, sticky='nswe')
+
+        self.labels_table = Sheet(self.master,
+                                        show_row_index=False,
+                                        header_height="0",
+                                        row_index_width=0,
+                                        show_y_scrollbar=False,
+                                        show_x_scrollbar=False,
+                                        data=[])
+        self.labels_table.headers(newheaders=['LABEL', 'VALUE'], index=None,
+                                              reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.labels_table.enable_bindings()
+
+        self.labels_table.grid(row=2, column=third_col, columnspan=1, sticky="nswe")
+
+        data_segment_label = Label(self.master, text="DATA SEGMENT", background="#484848", foreground="white")
+        data_segment_label.config(anchor=CENTER)
+        data_segment_label.grid(row=1, column=fifth_col, columnspan=1, sticky='nswe')
+        self.data_segment_table = Sheet(self.master,
+                                        show_row_index=False,
+                                        row_index_width=0,
+                                        show_y_scrollbar=False,
+                                        show_x_scrollbar=False,
+                                        data=[[]])
+        self.data_segment_table.enable_bindings()
+        self.data_segment_table.headers(newheaders=['ADDRESS', 'VALUE'], index=None,
+                                              reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.data_segment_table.grid(row=2, column=fifth_col, columnspan=1, sticky="nswe")
+
+
+        text_segment_label = Label(self.master, text="TEXT SEGMENT", background="#505050", foreground="white")
+        text_segment_label.config(anchor=CENTER)
+        text_segment_label.grid(row=1, column=fourth_col, columnspan=1, sticky='nswe')
+        self.text_segment_table = Sheet(self.master,
+                                  show_row_index=False,
+                                  header_height="0",
+                                  row_index_width=0,
+                                  show_y_scrollbar=False,
+                                  show_x_scrollbar=False,
+                                  data=[[]])
+        self.text_segment_table.headers(newheaders=['ADDRESS', 'CODE', 'BASIC'], index=None,
+                                              reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.text_segment_table.enable_bindings()
+        self.text_segment_table.grid(row=2, column=fourth_col, columnspan=1, sticky="nswe")
+
+
+        internal_registers_label = Label(self.master, text="INTERNAL REGISTERS", background="darkorange", foreground="white")
+        internal_registers_label.config(anchor=CENTER)
+        internal_registers_label.grid(row=5, column=second_col, columnspan=1,sticky='nswe')
+        self.internal_registers_table = Sheet(self.master,
+                                        show_row_index=False,
+                                        header_height="1",
+                                        row_index_width=0,
+                                        show_y_scrollbar=False,
+                                        show_x_scrollbar=False,
+                                        data=[[]])
+        self.internal_registers_table.headers(newheaders=['LABEL', 'CYCLE 1'], index=None,
+                                              reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.internal_registers_table.change_theme(theme = "dark blue")
+
+        self.internal_registers_table.enable_bindings()
+        self.internal_registers_table.grid(row=6, column=second_col, columnspan=1, sticky="nswe")
 
 
 
-        pipeline_map_label = Label(self.master, text="PIPELINE MAP",  background="darkORANGE", foreground="white")
+        pipeline_map_label = Label(self.master, text="PIPELINE MAP",  background="darkgreen", foreground="white")
         pipeline_map_label.config(anchor=CENTER)
-        pipeline_map_label.grid(row=5, column=1, columnspan=4, sticky='nswe')
-
+        pipeline_map_label.grid(row=5,  column=third_col, columnspan=3, sticky='nswe')
         self.pipeline_map_table = Sheet(self.master,
                                      show_row_index=False,
-                                     show_header=False,
                                      header_height="0",
                                      row_index_width=0,
                                      show_y_scrollbar=False,
                                      show_x_scrollbar=False,
-                                     data=[[f"Command {r}" if c == 0 else "0" for c in range(10)] for r in range(10)])
+                                     data=[])
         self.pipeline_map_table.enable_bindings()
-        self.pipeline_map_table.grid(row=6, column=1, columnspan=4, sticky="nswe")
+        self.pipeline_map_table.change_theme(theme = "dark blue")
+        self.pipeline_map_table.grid(row=6,  column=third_col, columnspan=3, sticky="nswe")
 
 
 
 
         self.repopulate_register_ui()
+        self.repopulate_internal_register_ui()
+        self.repopulate_data_segment_ui()
+        self.repopulate_text_segment_ui()
+        self.repopulate_pipeline_ui()
+
+
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
             print(f'{key}: {value}')
@@ -1051,4 +1262,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = Main(root, commands_dict, reserved_list, False)
     root.mainloop()
-`

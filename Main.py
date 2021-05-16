@@ -98,7 +98,8 @@ class Main(tk.Frame):
 
         }
         self.pipeline_map_df = pd.DataFrame(
-                                [{'Instruction': 'addi x, y, z',
+                                [{'Address': 'CC101232',
+                                  'Instruction': 'addi x, y, z',
                                   'Cycle 1': "IF",
                                   'Cycle 2': "ID",
                                   'Cycle 3': "EX",
@@ -106,7 +107,8 @@ class Main(tk.Frame):
                                   'Cycle 5': "WB",
                                   'Cycle 6': ""
                                   },
-                                 {'Instruction': 'subi x, y, z',
+                                 {'Address': 'FFFF1232',
+                                  'Instruction': 'subi x, y, z',
                                   'Cycle 1': "",
                                   'Cycle 2': "IF",
                                   'Cycle 3': "ID",
@@ -207,7 +209,7 @@ class Main(tk.Frame):
         for x in range(self.pipeline_map_df.shape[0]):
             list_version_of_pipeline_df += [self.pipeline_map_df.loc[x, :].values.tolist()]
 
-        list_of_clock_cycles = ['INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1])]
+        list_of_clock_cycles = ['ADDRESS' ,'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 1)]
 
         self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
                                      reset_col_positions=False, show_headers_if_not_sheet=True)
@@ -881,6 +883,67 @@ class Main(tk.Frame):
                     print("END UPDATE VARIABLE")
                     print("#" * 100)
 
+    # After parsing, generate a rough draft of the pipeline map
+    def generate_initial_pipeline_map(self):
+
+        # Reset pipeline map
+        counter = 1
+        self.pipeline_map_df = pd.DataFrame(columns=['Address', 'Instruction'])
+        total_initial_cycles = 5 + (len(self.binary_table_df.index))
+
+        # Create columns for each clock cycle
+        for cycle_number in range(1, total_initial_cycles):
+            cycle_name = 'Cycle ' + str(cycle_number)
+            self.pipeline_map_df[cycle_name] = []
+
+        # Iterate over each row in the opcode table
+        # to be added to the pipeline map
+        for index, row in self.binary_table_df.iterrows():
+
+            # Initialize row
+            is_started = False
+            internal_counter = None
+            row_to_add = {'Address': row['address'],
+                          'Instruction': row['instruction']}
+
+            # Add columns per cycle to the row
+            for n in range(1, total_initial_cycles):
+
+                cycle_name = 'Cycle ' + str(cycle_number)
+                cell = ''
+
+                # If the cycle is matched with the counter
+                # Start adding IF up to MEM for 5 columns
+                if n == counter:
+                    is_started = True
+                    internal_counter = 1
+                elif n > counter + 4:
+                    is_started = False
+
+                if is_started:
+
+                    cell = 'WB'
+
+                    if internal_counter == 1:
+                        cell = 'IF'
+                    elif internal_counter == 2:
+                        cell = 'ID'
+                    elif internal_counter == 3:
+                        cell = 'EX'
+                    elif internal_counter == 4:
+                        cell = 'MEM'
+
+                    internal_counter += 1
+                
+                # Add cycle to the row dictionary
+                row_to_add['cycle_name'] = cell
+
+            # Add row to the pipeline map
+            self.pipeline_map_df = self.pipeline_map_df.append(row_to_add)
+            counter += 1
+        
+        self.repopulate_pipeline_ui()
+
     # Gets the string from the edit text box
     def evaluate(self):
 
@@ -992,14 +1055,11 @@ class Main(tk.Frame):
                 self.print_in_terminal(has_error)
                 parsing_passed = False
 
-
         if parsing_passed:
             if self.test:
                 self.print_in_terminal(results)
 
             self.print_formatted_table()
-
-
 
             if not self.test:
                 self.print_in_terminal('Success in parsing.\n')
@@ -1014,6 +1074,8 @@ class Main(tk.Frame):
             print('Opcodes:')
             self.print_formatted_table()
             print('=' * 100)
+
+            self.generate_initial_pipeline_map()
 
     def execute(self):
         pass

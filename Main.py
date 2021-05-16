@@ -137,6 +137,9 @@ class Main(tk.Frame):
         self.text_segment_table=None
         self.create_widgets()
 
+        self.evaluate()
+
+
     def repopulate_register_ui(self):
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
 
@@ -209,7 +212,7 @@ class Main(tk.Frame):
         for x in range(self.pipeline_map_df.shape[0]):
             list_version_of_pipeline_df += [self.pipeline_map_df.loc[x, :].values.tolist()]
 
-        list_of_clock_cycles = ['ADDRESS' ,'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 1)]
+        list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 1)]
 
         self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
                                      reset_col_positions=False, show_headers_if_not_sheet=True)
@@ -222,13 +225,14 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
 
+
     def create_widgets(self):
         # self.master.grid_columnconfigure(0, weight=1)
         # self.master.grid_rowconfigure(0, weight=1)
 
         self.master.grid_columnconfigure(0, weight=1, uniform="group1")
         self.master.grid_columnconfigure(1, weight=1, uniform="group1")
-        self.master.grid_rowconfigure(0, weight=1)
+        # self.master.grid_rowconfigure(0, weight=1)
 
         first_col = 0
 
@@ -669,6 +673,7 @@ class Main(tk.Frame):
             row_to_return['pending_jump'] = pending_jump_name_temp
             row_to_return['address'] = address
             row_to_return['instruction'] = instruction
+
             row_to_return['line_number'] = self.line_counter
 
             self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
@@ -677,7 +682,6 @@ class Main(tk.Frame):
 
         # If is_command is False, handle special cases depending of instruction type
         elif not is_command:
-
             # Returns boolean if variable was added
             if instruction == 'variable':
 
@@ -904,12 +908,13 @@ class Main(tk.Frame):
             is_started = False
             internal_counter = None
             row_to_add = {'Address': row['address'],
-                          'Instruction': row['instruction']}
+                          'Instruction': row['instruction']
+                          }
 
             # Add columns per cycle to the row
             for n in range(1, total_initial_cycles):
 
-                cycle_name = 'Cycle ' + str(cycle_number)
+                cycle_name = 'Cycle ' + str(n)
                 cell = ''
 
                 # If the cycle is matched with the counter
@@ -930,18 +935,25 @@ class Main(tk.Frame):
                         cell = 'ID'
                     elif internal_counter == 3:
                         cell = 'EX'
+
+                       # if your rs1, rs2 exist in previous rows
+
+
                     elif internal_counter == 4:
                         cell = 'MEM'
 
                     internal_counter += 1
                 
                 # Add cycle to the row dictionary
-                row_to_add['cycle_name'] = cell
+                row_to_add[cycle_name] = cell
 
             # Add row to the pipeline map
-            self.pipeline_map_df = self.pipeline_map_df.append(row_to_add)
+
+            print(row_to_add)
+            self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
-        
+
+        print(self.pipeline_map_df)
         self.repopulate_pipeline_ui()
 
     # Gets the string from the edit text box
@@ -1325,3 +1337,4 @@ addi x0, x0, 0
     root = tk.Tk()
     app = Main(root, commands_dict, reserved_list, sample_input, False)
     root.mainloop()
+

@@ -2,6 +2,8 @@ import re
 import sys
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
+from pandas.core.frame import DataFrame
+from pandas.core.generic import NDFrame
 from tksheet import Sheet
 import pandas as pd
 pd.set_option('display.max_rows', None)
@@ -932,17 +934,40 @@ class Main(tk.Frame):
 
         # Iterate over each row in the opcode table
         # to be added to the pipeline map
-        for index, row in self.binary_table_df.iterrows():
+        #for index, row in self.binary_table_df.iterrows():
+        for i in range(self.binary_table_df.shape[0]):
 
             # Initialize row
             is_started = False
+            previous_rows = None
+            previous_rows_with_dependencies = None
             internal_counter = None
-            row_to_add = {'Address': row['address'],
-                          'Instruction': row['actual_command']
-                          }
-            current_rd = row['rd']
-            current_rs1 = row['rs1']
-            current_rs2 = row['rs2']
+            current_row = self.binary_table_df.loc[i,:]
+            current_rd = current_row['rd']
+            current_rs1 = current_row['rs1']
+            current_rs2 = current_row['rs2']
+            num_rows_lookback = i - 5 if i > 4 else 0
+            row_to_add = {'Address': current_row['address'], 'Instruction': current_row['actual_command']}
+
+            # If first row, don't get the previous
+            if i != 0:
+                previous_rows = self.binary_table_df.iloc[num_rows_lookback: i, :]
+
+                previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') & 
+                                                                ((previous_rows['rd'] == current_rs1) | 
+                                                                (previous_rows['rd'] == current_rs2)) ]
+            
+                # For checking of previous rows
+                # print('*' * 100)
+                # print(f'Current command {current_row["actual_command"]}:')
+                # # print('Previous 5 rows:')
+                # # print(previous_rows)
+                # print('Dependencies:')
+                # if previous_rows_with_dependencies.shape[0] > 0:
+                #     print(previous_rows_with_dependencies)
+                # else:
+                #     print(None)
+
 
             # Add columns per cycle to the row
             for n in range(1, total_initial_cycles):
@@ -984,7 +1009,7 @@ class Main(tk.Frame):
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
 
-        print(self.pipeline_map_df)
+        # print(self.pipeline_map_df)
         self.repopulate_pipeline_ui()
 
     # Gets the string from the edit text box

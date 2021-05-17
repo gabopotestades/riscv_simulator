@@ -677,18 +677,34 @@ class Main(tk.Frame):
             row_to_return['line_number'] = self.line_counter
             row_to_return['actual_command'] = actual_instruction
 
+            
+            # Get the opcode and default rd, rs1 and rs2
+            opcode = row_to_return['6-0'][2:].zfill(7)[::-1][0:7][::-1]
+            row_to_return['rd'] = 'x' +  str(int(row_to_return['11-7'][2:], 2))
+            row_to_return['rs1'] = 'x' +  str(int(row_to_return['19-15'][2:], 2))
+            row_to_return['rs2'] = 'x' +  str(int(row_to_return['24-20'][2:], 2))
+
+            # Handle special cases, reg-reg instruction is exempted
+            if   opcode == '0000011': #lw
+                row_to_return['rs2'] = ''
+            elif opcode == '0100011': #sw 
+                row_to_return['rd'] = ''
+            elif opcode == '1100011': #branch
+                row_to_return['rd'] = ''
+            elif opcode == '0010011': #immediate
+                row_to_return['rs2'] = ''
+
+            # print(f'{row_to_return["rd"]}, {row_to_return["rs1"]}, {row_to_return["rs2"]}')
+
             # Split the actual instruction's parameters into 3
-            splitted_actual_instruction = [x.replace(",", "") for x in actual_instruction.split(" ")]
-
-
-            row_to_return['rd'] = splitted_actual_instruction[1]
-            row_to_return['rs1'] = splitted_actual_instruction[2]
+            # splitted_actual_instruction = [x.replace(",", "") for x in actual_instruction.split(" ")]
+            # row_to_return['rd'] = splitted_actual_instruction[1]
+            # row_to_return['rs1'] = splitted_actual_instruction[2]
+            # row_to_return['rs2'] = ""
 
             # Check if rs2 exists
-            if len(splitted_actual_instruction) >= 4:
-                row_to_return['rs2'] = splitted_actual_instruction[3]
-            else:
-                row_to_return['rs2'] = ""
+            # if len(splitted_actual_instruction) >= 4:
+                # row_to_return['rs2'] = splitted_actual_instruction[3]
 
             self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
@@ -922,8 +938,11 @@ class Main(tk.Frame):
             is_started = False
             internal_counter = None
             row_to_add = {'Address': row['address'],
-                          'Instruction': row['instruction']
+                          'Instruction': row['actual_command']
                           }
+            current_rd = row['rd']
+            current_rs1 = row['rs1']
+            current_rs2 = row['rs2']
 
             # Add columns per cycle to the row
             for n in range(1, total_initial_cycles):
@@ -962,8 +981,6 @@ class Main(tk.Frame):
                 row_to_add[cycle_name] = cell
 
             # Add row to the pipeline map
-
-            print(row_to_add)
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
 
@@ -1344,6 +1361,8 @@ sll x7, x5, x6
 srl x8, x5, x6
 FIN: 
 addi x0, x0, 0
+lw x1, 3(x15)
+sw x2, 4(x13)
 """
 
     # endregion Declarables

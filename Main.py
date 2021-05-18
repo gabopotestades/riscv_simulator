@@ -2,6 +2,8 @@ import re
 import sys
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
+from pandas.core.frame import DataFrame
+from pandas.core.generic import NDFrame
 from tksheet import Sheet
 import pandas as pd
 pd.set_option('display.max_rows', None)
@@ -677,18 +679,34 @@ class Main(tk.Frame):
             row_to_return['line_number'] = self.line_counter
             row_to_return['actual_command'] = actual_instruction
 
+            
+            # Get the opcode and default rd, rs1 and rs2
+            opcode = row_to_return['6-0'][2:].zfill(7)[::-1][0:7][::-1]
+            row_to_return['rd'] = 'x' +  str(int(row_to_return['11-7'][2:], 2))
+            row_to_return['rs1'] = 'x' +  str(int(row_to_return['19-15'][2:], 2))
+            row_to_return['rs2'] = 'x' +  str(int(row_to_return['24-20'][2:], 2))
+
+            # Handle special cases, reg-reg instruction is exempted
+            if   opcode == '0000011': #lw
+                row_to_return['rs2'] = ''
+            elif opcode == '0100011': #sw 
+                row_to_return['rd'] = ''
+            elif opcode == '1100011': #branch
+                row_to_return['rd'] = ''
+            elif opcode == '0010011': #immediate
+                row_to_return['rs2'] = ''
+
+            # print(f'{row_to_return["rd"]}, {row_to_return["rs1"]}, {row_to_return["rs2"]}')
+
             # Split the actual instruction's parameters into 3
-            splitted_actual_instruction = [x.replace(",", "") for x in actual_instruction.split(" ")]
-
-
-            row_to_return['rd'] = splitted_actual_instruction[1]
-            row_to_return['rs1'] = splitted_actual_instruction[2]
+            # splitted_actual_instruction = [x.replace(",", "") for x in actual_instruction.split(" ")]
+            # row_to_return['rd'] = splitted_actual_instruction[1]
+            # row_to_return['rs1'] = splitted_actual_instruction[2]
+            # row_to_return['rs2'] = ""
 
             # Check if rs2 exists
-            if len(splitted_actual_instruction) >= 4:
-                row_to_return['rs2'] = splitted_actual_instruction[3]
-            else:
-                row_to_return['rs2'] = ""
+            # if len(splitted_actual_instruction) >= 4:
+                # row_to_return['rs2'] = splitted_actual_instruction[3]
 
             self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 current address
 
@@ -916,14 +934,40 @@ class Main(tk.Frame):
 
         # Iterate over each row in the opcode table
         # to be added to the pipeline map
-        for index, row in self.binary_table_df.iterrows():
+        #for index, row in self.binary_table_df.iterrows():
+        for i in range(self.binary_table_df.shape[0]):
 
             # Initialize row
             is_started = False
+            previous_rows = None
+            previous_rows_with_dependencies = None
             internal_counter = None
-            row_to_add = {'Address': row['address'],
-                          'Instruction': row['instruction']
-                          }
+            current_row = self.binary_table_df.loc[i,:]
+            current_rd = current_row['rd']
+            current_rs1 = current_row['rs1']
+            current_rs2 = current_row['rs2']
+            num_rows_lookback = i - 5 if i > 4 else 0
+            row_to_add = {'Address': current_row['address'], 'Instruction': current_row['actual_command']}
+
+            # If first row, don't get the previous
+            if i != 0:
+                previous_rows = self.binary_table_df.iloc[num_rows_lookback: i, :]
+
+                previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') & 
+                                                                ((previous_rows['rd'] == current_rs1) | 
+                                                                (previous_rows['rd'] == current_rs2)) ]
+            
+                # For checking of previous rows
+                # print('*' * 100)
+                # print(f'Current command {current_row["actual_command"]}:')
+                # # print('Previous 5 rows:')
+                # # print(previous_rows)
+                # print('Dependencies:')
+                # if previous_rows_with_dependencies.shape[0] > 0:
+                #     print(previous_rows_with_dependencies)
+                # else:
+                #     print(None)
+
 
             # Add columns per cycle to the row
             for n in range(1, total_initial_cycles):
@@ -962,12 +1006,10 @@ class Main(tk.Frame):
                 row_to_add[cycle_name] = cell
 
             # Add row to the pipeline map
-
-            print(row_to_add)
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
 
-        print(self.pipeline_map_df)
+        # print(self.pipeline_map_df)
         self.repopulate_pipeline_ui()
 
     # Gets the string from the edit text box
@@ -1344,6 +1386,8 @@ sll x7, x5, x6
 srl x8, x5, x6
 FIN: 
 addi x0, x0, 0
+lw x1, 3(x15)
+sw x2, 4(x13)
 """
 
     # endregion Declarables

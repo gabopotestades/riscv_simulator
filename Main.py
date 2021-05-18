@@ -225,7 +225,8 @@ class Main(tk.Frame):
         list_version_of_pipeline_df = []
 
         for x in range(self.pipeline_map_df.shape[0]):
-            list_version_of_pipeline_df += [self.pipeline_map_df.loc[x, :].values.tolist()]
+            list_version_of_pipeline_df += [
+                self.pipeline_map_df.loc[x, self.pipeline_map_df.columns != 'opcode'].values.tolist()]
 
         list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 2)]
 

@@ -93,26 +93,7 @@ class Main(tk.Frame):
 
 
 
-        self.pipeline_map_df = pd.DataFrame(
-                                [{'Address': 'CC101232',
-                                  'Instruction': 'addi x, y, z',
-                                  'Cycle 1': "IF",
-                                  'Cycle 2': "ID",
-                                  'Cycle 3': "EX",
-                                  'Cycle 4': "ME",
-                                  'Cycle 5': "WB",
-                                  'Cycle 6': ""
-                                  },
-                                 {'Address': 'FFFF1232',
-                                  'Instruction': 'subi x, y, z',
-                                  'Cycle 1': "",
-                                  'Cycle 2': "IF",
-                                  'Cycle 3': "ID",
-                                  'Cycle 4': "EX",
-                                  'Cycle 5': "ME",
-                                  'Cycle 6': "WB",
-                                  }
-                               ])
+        self.pipeline_map_df = pd.DataFrame()
 
         self.commands_dict = commands_dict
         self.reserved_list = reserved_list
@@ -225,8 +206,12 @@ class Main(tk.Frame):
         list_version_of_pipeline_df = []
 
         for x in range(self.pipeline_map_df.shape[0]):
-            list_version_of_pipeline_df += [
-                self.pipeline_map_df.loc[x, self.pipeline_map_df.columns != 'opcode'].values.tolist()]
+            temp_flattened_list = self.pipeline_map_df.loc[x, self.pipeline_map_df.columns != 'opcode'].values.tolist()
+            temp_flattened_list[0] = "0x" + "{0:0>4X}".format(int(temp_flattened_list[0], 2))
+
+            list_version_of_pipeline_df += [temp_flattened_list]
+
+
 
         list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 2)]
 

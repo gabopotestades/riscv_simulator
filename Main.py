@@ -53,8 +53,8 @@ class Main(tk.Frame):
 
         self.registers_dict = {
             "x0": {"is_editable": False, "value": 0},
-            "x1": {"is_editable": True, "value": 100},
-            "x2": {"is_editable": True, "value": 100101},
+            "x1": {"is_editable": True, "value": 0},
+            "x2": {"is_editable": True, "value": 0},
             "x3": {"is_editable": True, "value": 0},
             "x4": {"is_editable": True, "value": 0},
             "x5": {"is_editable": True, "value": 0},
@@ -92,13 +92,7 @@ class Main(tk.Frame):
         }
 
 
-        self.text_segment_dict = {
-            "10001FFF": 0
-        }
 
-        self.labels_dict = {
-
-        }
         self.pipeline_map_df = pd.DataFrame(
                                 [{'Address': 'CC101232',
                                   'Instruction': 'addi x, y, z',
@@ -181,9 +175,21 @@ class Main(tk.Frame):
                                                      reset_highlights=False)
 
     def repopulate_text_segment_ui(self):
+
         list_version_of_text_segment_dict = []
-        for address, value in self.text_segment_dict.items():
-            list_version_of_text_segment_dict += [[address, value]]
+
+
+        for index, row in self.binary_table_df.iterrows():
+            thirty_one_to_twenty_five = row['31-25'][2:].zfill(7)[::-1][0:8][::-1]
+            twenty_four_to_twenty = row['24-20'][2:].zfill(7)[::-1][0:8][::-1]
+            nineteen_to_fifteen = row['19-15'][2:].zfill(7)[::-1][0:8][::-1]
+            fourteen_to_twelve = row['14-12'][2:].zfill(7)[::-1][0:8][::-1]
+            eleven_to_seven = row['11-7'][2:].zfill(7)[::-1][0:8][::-1]
+            six_to_zero = row['6-0'][2:].zfill(7)[::-1][0:8][::-1]
+
+            concatenated = thirty_one_to_twenty_five + twenty_four_to_twenty + nineteen_to_fifteen + fourteen_to_twelve + eleven_to_seven + six_to_zero
+
+            list_version_of_text_segment_dict += [["0x" + "{0:0>4X}".format(int(row['address'], 2)), "0x" + "{0:0>8X}".format(int(concatenated, 2)), row['actual_command']]]
 
         self.text_segment_table.set_sheet_data(data=list_version_of_text_segment_dict,
                                                reset_col_positions=True,
@@ -192,12 +198,19 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
 
-    def repopulate_labels_ui(self):
-        list_version_of_labels_dict = []
-        for label, value in self.labels_dict.items():
-            list_version_of_labels_dict += [[label, value]]
 
-        self.text_segment_table.set_sheet_data(data=list_version_of_labels_dict,
+    def repopulate_labels_ui(self):
+
+        list_version_of_labels_dict = []
+        for label, value in self.jump_instructions.items():
+            list_version_of_labels_dict += [[label, "0x" + "{0:0>4X}".format(int(value, 2))]]
+
+        for name, value in self.variables.items():
+            address = value['address']
+
+            list_version_of_labels_dict += [[name, "0x" + "{0:0>4X}".format(int(address, 2))]]
+
+        self.labels_table.set_sheet_data(data=list_version_of_labels_dict,
                                                reset_col_positions=True,
                                                reset_row_positions=True,
                                                redraw=True,
@@ -379,7 +392,6 @@ class Main(tk.Frame):
         self.repopulate_register_ui()
         self.repopulate_internal_register_ui()
         self.repopulate_data_segment_ui()
-        self.repopulate_text_segment_ui()
         self.repopulate_pipeline_ui()
 
     def print_jump_intructions(self):
@@ -1224,6 +1236,9 @@ class Main(tk.Frame):
             # print('=' * 100)
 
             self.generate_initial_pipeline_map()
+
+        self.repopulate_labels_ui()
+        self.repopulate_text_segment_ui()
 
     def execute(self):
         pass

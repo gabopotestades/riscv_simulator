@@ -214,7 +214,7 @@ class Main(tk.Frame):
         for x in range(self.pipeline_map_df.shape[0]):
             list_version_of_pipeline_df += [self.pipeline_map_df.loc[x, :].values.tolist()]
 
-        list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 1)]
+        list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 2)]
 
         self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
                                      reset_col_positions=False, show_headers_if_not_sheet=True)
@@ -924,17 +924,17 @@ class Main(tk.Frame):
 
         # Reset pipeline map
         counter = 1
-        self.pipeline_map_df = pd.DataFrame(columns=['Address', 'Instruction'])
-        total_initial_cycles = 5 + (len(self.binary_table_df.index))
+        self.pipeline_map_df = pd.DataFrame(columns=['address', 'instruction', 'opcode'])
+        total_initial_cycles = 4 + (len(self.binary_table_df.index))
 
         # Create columns for each clock cycle
         for cycle_number in range(1, total_initial_cycles):
             cycle_name = 'Cycle ' + str(cycle_number)
-            self.pipeline_map_df[cycle_name] = []
+            self.pipeline_map_df[cycle_name] = ''
 
         # Iterate over each row in the opcode table
         # to be added to the pipeline map
-        #for index, row in self.binary_table_df.iterrows():
+        # for index, row in self.binary_table_df.iterrows():
         for i in range(self.binary_table_df.shape[0]):
 
             # Initialize row
@@ -942,12 +942,13 @@ class Main(tk.Frame):
             previous_rows = None
             previous_rows_with_dependencies = None
             internal_counter = None
+            stall_count = 0
             current_row = self.binary_table_df.loc[i,:]
-            current_rd = current_row['rd']
             current_rs1 = current_row['rs1']
             current_rs2 = current_row['rs2']
             num_rows_lookback = i - 5 if i > 4 else 0
-            row_to_add = {'Address': current_row['address'], 'Instruction': current_row['actual_command']}
+            current_opcode = current_row['6-0'][2:].zfill(7)[::-1][0:7][::-1]
+            row_to_add = {'address': current_row['address'], 'instruction': current_row['actual_command'], 'opcode': current_opcode}
 
             # If first row, don't get the previous
             if i != 0:
@@ -956,31 +957,30 @@ class Main(tk.Frame):
                 previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') & 
                                                                 ((previous_rows['rd'] == current_rs1) | 
                                                                 (previous_rows['rd'] == current_rs2)) ]
-            
-                # For checking of previous rows
-                # print('*' * 100)
-                # print(f'Current command {current_row["actual_command"]}:')
-                # # print('Previous 5 rows:')
-                # # print(previous_rows)
-                # print('Dependencies:')
-                # if previous_rows_with_dependencies.shape[0] > 0:
-                #     print(previous_rows_with_dependencies)
-                # else:
-                #     print(None)
 
-
+            has_stall = False
+            cycle_number = 1
+            max_additional_cycles = 4
+            n = 4 + (len(self.binary_table_df.index))
             # Add columns per cycle to the row
-            for n in range(1, total_initial_cycles):
+            while n > 0:
 
-                cycle_name = 'Cycle ' + str(n)
                 cell = ''
+                cycle_name = 'Cycle ' + str(cycle_number)
+
+                lw_opcode = '0000011'
+                sw_opcode = '0100011'
+                branch_opcode = '1100011'
+                alu_opcodes = ['0010011', '0110011']
+                
+                if has_stall: max_additional_cycles = 5
 
                 # If the cycle is matched with the counter
                 # Start adding IF up to MEM for 5 columns
-                if n == counter:
+                if cycle_number == counter:
                     is_started = True
                     internal_counter = 1
-                elif n > counter + 4:
+                elif cycle_number > counter + max_additional_cycles:
                     is_started = False
 
                 if is_started:
@@ -994,22 +994,102 @@ class Main(tk.Frame):
                     elif internal_counter == 3:
                         cell = 'EX'
 
-                       # if your rs1, rs2 exist in previous rows
+                        if i != 0 and previous_rows_with_dependencies.shape[0] > 0:
+
+                            for index, row in previous_rows_with_dependencies.iterrows():
+                                
+                                address_of_dependency = row['address']
+                                current_row_with_dependency = self.pipeline_map_df[self.pipeline_map_df['address'] == address_of_dependency].reset_index(drop=True)
+                                
+                                if current_row_with_dependency.shape[0] > 0:
+                                    current_row_with_dependency_rd = self.binary_table_df[self.binary_table_df['address'] == address_of_dependency].reset_index(drop=True)
+                                    current_row_with_dependency_rd = current_row_with_dependency_rd['rd'][0]
+                                    
+                                    current_row_with_dependency_opcode = current_row_with_dependency['opcode'][0]
+                                    current_columns_of_row_with_dependency = current_row_with_dependency.columns
+                                
+                                    step = None
+                                    if current_row_with_dependency_opcode == lw_opcode and current_opcode != lw_opcode:
+                                        step = 'MEM'
+                                    elif current_row_with_dependency_opcode in alu_opcodes and \
+                                        current_opcode not in[lw_opcode, sw_opcode]:
+                                        step = 'EX'
+                                    elif current_row_with_dependency_opcode in alu_opcodes and \
+                                        current_opcode in [sw_opcode, lw_opcode] and current_rs1 == current_row_with_dependency_rd:
+                                        step = 'EX'
+                                    
+                                    if step:
+                                        for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
+                                            if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
+                                                if cycle_number <= col_num:
+                                                    stall_count = (col_num - cycle_number) + 1
+                                                    max_additional_cycles += stall_count
+                                                    has_stall = True
+
+                                                    if i == self.binary_table_df.shape[0] - 1:
+                                                        new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                                                        self.pipeline_map_df[new_cycle] = ''
+                                                        row_to_add[new_cycle] = ''
+                                                        n += 1
 
 
                     elif internal_counter == 4:
                         cell = 'MEM'
 
-                    internal_counter += 1
+                        if i != 0 and previous_rows_with_dependencies.shape[0] > 0:
+
+                            for index, row in previous_rows_with_dependencies.iterrows():
+                                
+                                address_of_dependency = row['address']
+                                current_row_with_dependency = self.pipeline_map_df[self.pipeline_map_df['address'] == address_of_dependency].reset_index(drop=True)
+                                
+                                if current_row_with_dependency.shape[0] > 0:
+                                    current_row_with_dependency_rd = self.binary_table_df[self.binary_table_df['address'] == address_of_dependency].reset_index(drop=True)
+                                    current_row_with_dependency_rd = current_row_with_dependency_rd['rd'][0]
+                                    
+                                    current_row_with_dependency_opcode = current_row_with_dependency['opcode'][0]
+                                    current_columns_of_row_with_dependency = current_row_with_dependency.columns
+                                
+                                    step = None
+                                    if current_row_with_dependency_opcode == lw_opcode and current_rs1 == current_row_with_dependency_rd:
+                                        step = 'MEM'
+                                    
+                                    if step:
+                                        for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
+                                            if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
+                                                if cycle_number <= col_num:
+                                                    stall_count = (col_num - cycle_number) + 1
+                                                    max_additional_cycles += stall_count
+                                                    has_stall = True
+
+                                                    if i == self.binary_table_df.shape[0] - 1:
+                                                        new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                                                        self.pipeline_map_df[new_cycle] = ''
+                                                        row_to_add[new_cycle] = ''
+                                                        n += 1
+
+
+                    elif internal_counter == 5:
+                        cell = 'WB'
+                        has_stall = False
+
+                    if stall_count == 0:
+                        max_additional_cycles = 4
+                        internal_counter += 1
+                    else:
+                        cell = '*'
+                        stall_count -= 1
                 
                 # Add cycle to the row dictionary
                 row_to_add[cycle_name] = cell
+                cycle_number += 1
+                n -= 1
 
             # Add row to the pipeline map
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
 
-        # print(self.pipeline_map_df)
+        print(self.pipeline_map_df)
         self.repopulate_pipeline_ui()
 
     # Gets the string from the edit text box
@@ -1127,21 +1207,21 @@ class Main(tk.Frame):
             if self.test:
                 self.print_in_terminal(results)
 
-            self.print_formatted_table()
+            # self.print_formatted_table()
 
             if not self.test:
                 self.print_in_terminal('Success in parsing.\n')
 
-            print('=' * 100)
-            print('Jump Instructions:')
-            self.print_jump_intructions()
-            print('=' * 100)
-            print('Declared Variables:')
-            self.print_variables()
-            print('=' * 100)
-            print('Opcodes:')
-            self.print_formatted_table()
-            print('=' * 100)
+            # print('=' * 100)
+            # print('Jump Instructions:')
+            # self.print_jump_intructions()
+            # print('=' * 100)
+            # print('Declared Variables:')
+            # self.print_variables()
+            # print('=' * 100)
+            # print('Opcodes:')
+            # self.print_formatted_table()
+            # print('=' * 100)
 
             self.generate_initial_pipeline_map()
 
@@ -1288,88 +1368,26 @@ if __name__ == "__main__":
         }
     }
 
-
-#         sample_input = """.data
-# var1: .word 0x0f
-# var2: .word 2
-# var3: .word 0x08
-
-# .text
-# jump:
-
-# """
-
-        # Sample input for r-type
-#         sample_input = """.text
-# add x0, x1, x2
-# and x3, x4, x5
-# or x6, x7, x8
-# xor x9, x10, x11
-# slt x12, x13, x14
-# srl x15, x16, x17
-# sll x18, x19, x20
-# """
-
-        # Sample input for i-type
-#         sample_input = """.text
-# addi x0, x1, 0x2
-# slti x3, x4, 0x5
-# slli x6, x7, 4
-# srli x9, x10, 34543
-# andi x12, x13, 0xfff
-# ori x15, x22, 234
-# xori x31, x19, 0xabcdef
-# """
-
-        # Sample input for s-type
-#         sample_input = """.text
-# lw x6, 0(x8)
-# sw x10, (x9)
-# """
-
-
-        # Sample input for sb-type
-#         sample_input = """.data
-# var1: .word 1
-# .text
-# lw x9, var1
-# lw x10, var2
-# beq x9, x10, jumper
-# jumper:
-# lw x0, var1
+#     sample_input =  """
 # .data
-# var2: .word 2
-#         """
-
-
-#         sample_input =  """.data
-# var1: .word 0x0f
-# var2: .word 15
+# var1: .word 6
+# x: .word 0x0ff
 # .text
-# addi x3, x31, 0x0ff
-# addi x3, x4, 0x0ff
-# addi x3, x5, 255
-# beq x0, x02, jumper
-# lw x1, +15
-# lw x1, var1
-# lw x1, 0(x15)
-# lw x1, -15(x0)
-# lw x1, 0xf
-# lw x6, var5
-# jumper:
-# lw x1, -2
-# sw x1, -2
-# sw x2, var2
-# sw x3, 0xc
-# .data
-# var4: .word 33
-# var5: .word 0x21
-# .text
-# add x3, x4, x7
-# addi x6, x23, -2
-# slti x3, x4, 0x5
+# addi x5, x0, 8
+# addi x6, x0, 4
+# BLT x5, x6, L1
+# xor x6, x5, x6
+# and x8, x6, x6
+# beq x0, x0, FIN
+# L1: 
+# sll x7, x5, x6
+# srl x8, x5, x6
+# FIN: 
+# addi x0, x0, 0
+# lw x1, 3(x15)
+# addi x2, x1, 33
+# sw x2, 4(x13)
 # """
-
     sample_input =  """
 .data
 var1: .word 6
@@ -1378,16 +1396,15 @@ x: .word 0x0ff
 addi x5, x0, 8
 addi x6, x0, 4
 BLT x5, x6, L1
-xor x7, x5, x6
-and x8, x5, x6
-beq x0, x0, FIN
 L1: 
-sll x7, x5, x6
-srl x8, x5, x6
-FIN: 
 addi x0, x0, 0
 lw x1, 3(x15)
+addi x2, x1, 33
+lw x6, 4(x2)
 sw x2, 4(x13)
+lw x6, 55
+addi x18, x6, 4
+lw x6, 2(x18)
 """
 
     # endregion Declarables

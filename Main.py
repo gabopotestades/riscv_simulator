@@ -226,7 +226,7 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
         import csv
-        with open('output.csv', 'w', newline='') as csvfile:
+        with open('pipelinemap.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerows(list_version_of_pipeline_df)
 

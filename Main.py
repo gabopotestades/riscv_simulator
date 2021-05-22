@@ -922,8 +922,10 @@ class Main(tk.Frame):
 
         # Reset pipeline map
         counter = 1
-        self.pipeline_map_df = pd.DataFrame(columns=['address', 'instruction', 'opcode'])
+        additional_columns = 4
+        previous_stalled = None
         total_initial_cycles = 4 + (len(self.binary_table_df.index))
+        self.pipeline_map_df = pd.DataFrame(columns=['address', 'instruction', 'opcode'])
 
         # Create columns for each clock cycle
         for cycle_number in range(1, total_initial_cycles):
@@ -933,35 +935,32 @@ class Main(tk.Frame):
         # Iterate over each row in the opcode table
         # to be added to the pipeline map
         # for index, row in self.binary_table_df.iterrows():
-        for i in range(self.binary_table_df.shape[0]):
+        for opcode_index in range(self.binary_table_df.shape[0]):
 
             # Initialize row
             is_started = False
             previous_rows = None
             previous_rows_with_dependencies = None
-            internal_counter = None
+            internal_counter = 1
             stall_count = 0
-            current_row = self.binary_table_df.loc[i,:]
+            current_row = self.binary_table_df.loc[opcode_index,:]
             current_rs1 = current_row['rs1']
             current_rs2 = current_row['rs2']
-            num_rows_lookback = i - 5 if i > 4 else 0
+            num_rows_lookback = opcode_index - 5 if opcode_index > 4 else 0
             current_opcode = current_row['6-0'][2:].zfill(7)[::-1][0:7][::-1]
             row_to_add = {'address': current_row['address'], 'instruction': current_row['actual_command'], 'opcode': current_opcode}
 
             # If first row, don't get the previous
-            if i != 0:
-                previous_rows = self.binary_table_df.iloc[num_rows_lookback: i, :]
-
+            if opcode_index != 0:
+                previous_rows = self.binary_table_df.iloc[num_rows_lookback: opcode_index, :]
                 previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') & 
                                                                 ((previous_rows['rd'] == current_rs1) | 
                                                                 (previous_rows['rd'] == current_rs2)) ]
 
-            has_stall = False
             cycle_number = 1
-            max_additional_cycles = 4
-            n = 4 + (len(self.binary_table_df.index))
+            column_in_current_cycle = additional_columns + (len(self.binary_table_df.index))
             # Add columns per cycle to the row
-            while n > 0:
+            while column_in_current_cycle > 0:       
 
                 cell = ''
                 cycle_name = 'Cycle ' + str(cycle_number)
@@ -971,28 +970,48 @@ class Main(tk.Frame):
                 branch_opcode = '1100011'
                 alu_opcodes = ['0010011', '0110011']
                 
-                if has_stall: max_additional_cycles = 5
 
-                # If the cycle is matched with the counter
                 # Start adding IF up to MEM for 5 columns
                 if cycle_number == counter:
                     is_started = True
-                    internal_counter = 1
-                elif cycle_number > counter + max_additional_cycles:
+                # Internal counter is incremented 1 per iteration
+                elif internal_counter > 5:
                     is_started = False
 
                 if is_started:
 
-                    cell = 'WB'
-
                     if internal_counter == 1:
                         cell = 'IF'
+
+                        if previous_stalled == 'ID':
+
+                            new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                            self.pipeline_map_df[new_cycle] = ''
+                            row_to_add[new_cycle] = ''
+                            column_in_current_cycle += 1
+                            additional_columns += 1
+                                       
+                            previous_stalled = None
+                            internal_counter -= 1
+                            counter += 1
+                            cell = ''
+
                     elif internal_counter == 2:
+
                         cell = 'ID'
+
+                        if previous_stalled == 'EX':                   
+                            previous_stalled = 'ID'
+                            internal_counter -= 1
+                            cell = '*'
+
                     elif internal_counter == 3:
                         cell = 'EX'
 
-                        if i != 0 and previous_rows_with_dependencies.shape[0] > 0:
+                        if previous_stalled == 'MEM':
+                            previous_stalled = 'EX'
+
+                        if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
                                 
@@ -1021,20 +1040,14 @@ class Main(tk.Frame):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
                                                 if cycle_number <= col_num:
                                                     stall_count = (col_num - cycle_number) + 1
-                                                    max_additional_cycles += stall_count
-                                                    has_stall = True
-
-                                                    if i == self.binary_table_df.shape[0] - 1:
-                                                        new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
-                                                        self.pipeline_map_df[new_cycle] = ''
-                                                        row_to_add[new_cycle] = ''
-                                                        n += 1
-
-
+                                                    previous_stalled = step
+                                                    internal_counter -= 1
+                                                    cell = '*'
+                                                    
                     elif internal_counter == 4:
                         cell = 'MEM'
 
-                        if i != 0 and previous_rows_with_dependencies.shape[0] > 0:
+                        if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
                                 
@@ -1057,31 +1070,33 @@ class Main(tk.Frame):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
                                                 if cycle_number <= col_num:
                                                     stall_count = (col_num - cycle_number) + 1
-                                                    max_additional_cycles += stall_count
-                                                    has_stall = True
+                                                    previous_stalled = step
+                                                    internal_counter -= 1
+                                                    cell = '*'
 
-                                                    if i == self.binary_table_df.shape[0] - 1:
-                                                        new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
-                                                        self.pipeline_map_df[new_cycle] = ''
-                                                        row_to_add[new_cycle] = ''
-                                                        n += 1
-
-
+                        # Add extra column if the second to the last column is reached
+                        if opcode_index == len(self.binary_table_df) - 1 and previous_stalled:
+                            new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                            self.pipeline_map_df[new_cycle] = ''
+                            row_to_add[new_cycle] = ''
+                            column_in_current_cycle += 1
+                            additional_columns += 1
+                   
                     elif internal_counter == 5:
-                        cell = 'WB'
-                        has_stall = False
+                        # print(f'{opcode_index}: Cycle Num: {cycle_number}, Stall: {stall_count}, Counter: {counter}')
 
-                    if stall_count == 0:
-                        max_additional_cycles = 4
-                        internal_counter += 1
-                    else:
-                        cell = '*'
-                        stall_count -= 1
+                        cell = 'WB'
+                        
+                    # if stall_count == 0:
+                    internal_counter += 1
+                    # else:
+                    #     cell = '*'
+                    #     stall_count -= 1
                 
                 # Add cycle to the row dictionary
                 row_to_add[cycle_name] = cell
                 cycle_number += 1
-                n -= 1
+                column_in_current_cycle -= 1
 
             # Add row to the pipeline map
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
@@ -1389,6 +1404,7 @@ if __name__ == "__main__":
 # addi x2, x1, 33
 # sw x2, 4(x13)
 # """
+
     sample_input =  """
 .data
 var1: .word 6
@@ -1407,6 +1423,31 @@ lw x6, 55
 addi x18, x6, 4
 lw x6, 2(x18)
 """
+
+# Data Hazard slides
+
+#     sample_input =  """
+# .data
+# var1: .word 6
+# x: .word 0x0ff
+# .text
+# add x1, x2, x3
+# add x4, x1, x5
+# and x6, x1, x7
+# or x8, x1, x9
+# xor x10, x1, x11
+# """
+
+#     sample_input =  """
+# .data
+# var1: .word 6
+# x: .word 0x0ff
+# .text
+# lw x1, 0(x2)
+# add x4, x1, x5
+# and x6, x1, x7
+# or x8, x1, x9
+# """
 
     # endregion Declarables
 

@@ -1,1 +1,1 @@
-0x1000,"addi x5, x0, -8",IF,ID,EX,MEM,WB
+0x1000,"addi x5, x0, 8",IF,ID,EX,MEM,WB

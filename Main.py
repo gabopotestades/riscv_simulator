@@ -1251,6 +1251,16 @@ class Main(tk.Frame):
 
     def execute(self):
 
+        # def twos_comp(val, bits):
+        #     """compute the 2's complement of int value val"""
+        #     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
+        #         val = val - (1 << bits)        # compute negative value
+        #     return val                         # return positive value as is
+        
+        def twos_comp(n, bits):
+            s = bin(n & int("1"*bits, 2))[2:]
+            return ("{0:0>%s}" % (bits)).format(s)
+
         def to_signed_integer(integer, bit_size = 8):
 
             unsigned = integer % 2**bit_size
@@ -1362,6 +1372,9 @@ class Main(tk.Frame):
                     imme = int(self.internal_registers_dict['ID/EX.IMM']['value'], 2)             
                     imme = to_signed_integer(imme)
 
+                    # print(f'Register A: {register_a}')
+                    # print(f'Immediate: {imme}')
+
                     if instruction == 'addi':
                         
                         result = register_a + imme
@@ -1379,13 +1392,7 @@ class Main(tk.Frame):
                     elif instruction == 'xori':
                         pass
 
-                    if result > -1:
-                        result = bin(result)
-                    else:
-                        print(f'result: {result}')
-                        result = bin(abs(result) & 0xfff)[2:] #for two's complement
-
-                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = result[2:0]
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
 
                 elif six_to_zero == BRANCH_OPCODE:
                     pass

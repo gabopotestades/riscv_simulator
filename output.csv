@@ -1,0 +1,11 @@
+0x1000,"addi x5, x0, 8",IF,ID,EX,MEM,WB,,,,,,,,,,,,
+0x1004,"addi x6, x0, 4",,IF,ID,EX,MEM,WB,,,,,,,,,,,
+0x1008,"blt x5, x6, l1",,,IF,ID,EX,MEM,WB,,,,,,,,,,
+0x100C,"addi x0, x0, 0",,,,IF,ID,EX,MEM,WB,,,,,,,,,
+0x1010,"lw x1, 3(x15)",,,,,IF,ID,EX,MEM,WB,,,,,,,,
+0x1014,"addi x2, x1, 33",,,,,,IF,ID,*,EX,MEM,WB,,,,,,
+0x1018,"lw x6, 4(x2)",,,,,,,IF,*,ID,EX,MEM,WB,,,,,
+0x101C,"sw x2, 4(x13)",,,,,,,,,IF,ID,EX,MEM,WB,,,,
+0x1020,"lw x6, 55",,,,,,,,,,IF,ID,EX,MEM,WB,,,
+0x1024,"addi x18, x6, 4",,,,,,,,,,,IF,ID,*,EX,MEM,WB,
+0x1028,"lw x6, 2(x18)",,,,,,,,,,,,IF,*,ID,EX,MEM,WB

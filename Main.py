@@ -38,26 +38,29 @@ class Main(tk.Frame):
         self.edit_text = None
         self.terminal_text = None
         self.internal_registers_dict = {
-            "IF/ID.IR": {"value": ''},
-            "IF/ID.NPC": {"value": ''},
-            "PC": {"value": ''},
+            "IF/ID.IR": {"value": '0'},
+            "IF/ID.NPC": {"value": '0'},
+            "PC": {"value": '0'},
 
-            "ID/EX.A": {"value": ''},
-            "ID/EX.B": {"value": ''},
-            "ID/EX.IMM": {"value": ''},
-            "ID/EX.IR": {"value": ''},
-            "ID/EX.NPC": {"value": ''},
+            "ID/EX.A": {"value": '0'},
+            "ID/EX.B": {"value": '0'},
+            "ID/EX.IMM": {"value": '0'},
+            "ID/EX.IR": {"value": '0'},
+            "ID/EX.NPC": {"value": '0'},
 
-            "EX/MEM.ALUOUTPUT": {"value": ''},
-            "EX/MEM.COND": {"value": ''},
-            "EX/MEM.IR": {"value": ''},
-            "EX/MEM.B": {"value": ''},
+            "EX/MEM.ALUOUTPUT": {"value": '0'},
+            "EX/MEM.COND": {"value": '0'},
+            "EX/MEM.IR": {"value": '0'},
+            "EX/MEM.B": {"value": '0'},
 
-            "MEM/WB.LMD": {"value": ''},
-            "MEM/WB.IR": {"value": ''},
-            "MEM/WB.ALUOUTPUT": {"value": ''},
-            "MEM/MEMORY AFFECTED": {"value": ''},
-            "WB/REGISTERS AFFECTED": {"value": ''}
+            "MEM/WB.LMD": {"value": '0'},
+            "MEM/WB.IR": {"value": '0'},
+            "MEM/WB.ALUOUTPUT": {"value": '0'},
+            "MEM/MEMORY AFFECTED": {"value": '0'},
+            "MEM/MEMORY VALUE": {"value": '0'},
+            
+            "WB/REGISTER AFFECTED": {"value": '0'},
+            "WB/REGISTER VALUE": {"value": '0'}
         }
 
         self.registers_dict = {
@@ -1251,12 +1254,6 @@ class Main(tk.Frame):
 
     def execute(self):
 
-        # def twos_comp(val, bits):
-        #     """compute the 2's complement of int value val"""
-        #     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
-        #         val = val - (1 << bits)        # compute negative value
-        #     return val                         # return positive value as is
-        
         def twos_comp(n, bits):
             s = bin(n & int("1"*bits, 2))[2:]
             return ("{0:0>%s}" % (bits)).format(s)
@@ -1277,7 +1274,7 @@ class Main(tk.Frame):
             for cell in self.pipeline_map_df[column]:            
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
-        print(self.binary_table_df)
+        self.print_formatted_table()
         print('*' * 100)
         print('Jump Instructions: ')
         self.print_jump_intructions()
@@ -1407,7 +1404,33 @@ class Main(tk.Frame):
                 print('=' * 100)
 
             elif cycle_instruction == 'MEM':
-                pass
+
+                self.internal_registers_dict['MEM/WB.IR']['value'] = self.internal_registers_dict['EX/MEM.IR']['value']
+                self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = '0'
+                self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = '0'
+
+                       
+                if six_to_zero in [ALU_ALU_OPCODE, ALU_IMM_OPCODE]:
+                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
+                elif six_to_zero == BRANCH_OPCODE:
+                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
+                elif six_to_zero == SW_OPCODE:
+                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '' # aayusin pa
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
+                elif six_to_zero == LW_OPCODE:
+                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '' # aayusin pa
+                
+
+                print(f"Cycle: {cycle_instruction}")
+                print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
+                print(f"LMD: {self.internal_registers_dict['MEM/WB.LMD']['value']}")
+                print(f"MEMORY AFFECTED: {self.internal_registers_dict['MEM/MEMORY AFFECTED']['value']}")
+                print(f"MEMORY VALUE: {self.internal_registers_dict['MEM/MEMORY VALUE']['value']}")
+                print('=' * 100)
+
             elif cycle_instruction == 'WB':
                 pass
 

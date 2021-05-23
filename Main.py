@@ -67,8 +67,8 @@ class Main(tk.Frame):
             "x0": {"is_editable": False, "value": '0'},
             "x1": {"is_editable": True, "value": '0'},
             "x2": {"is_editable": True, "value": '0'},
-            "x3": {"is_editable": True, "value": '0'},
-            "x4": {"is_editable": True, "value": '00000000000000000000000000000101'},
+            "x3": {"is_editable": True, "value": '00000000000000000000000000001011'},
+            "x4": {"is_editable": True, "value": '00000000000000000000000000001000'},
             "x5": {"is_editable": True, "value": '0'},
             "x6": {"is_editable": True, "value": '0'},
             "x7": {"is_editable": True, "value": '0'},
@@ -1360,17 +1360,79 @@ class Main(tk.Frame):
                 self.internal_registers_dict['EX/MEM.COND']['value'] = '0'
                 result = 0
 
+                register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
+                register_b_in_binary = self.internal_registers_dict['ID/EX.B']['value']
+
+                # Convert to two's complement
+                register_a = int(register_a_in_binary, 2)
+                register_a = to_signed_integer(register_a, 32)
+
+                register_b = int(register_b_in_binary, 2)
+                register_b = to_signed_integer(register_b, 32)
+
                 if six_to_zero == ALU_ALU_OPCODE:
-                    pass
+                    if instruction == 'add':
+                        # performs addition of rs1 and rs2. Arithmetic overflow is ignored,
+                        # and the low 32 bits of the result is written in rd.
+                        result = register_a + register_b
+                    elif instruction == 'slt':
+                        # SLT (set if less than) performs signed compare, places the value 1 in
+                        # register rd if register rs1 < rs2, 0 otherwise.
+                        result = 1 if register_a < register_b else 0
+                    elif instruction == 'sll':
+                        # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift
+                        # amount held in the lower 5 bits of register rs2 and the result is placed in rd.
+                        # Zeros are shifted into the lower bits.
+
+
+                        # Get five lower bits and cast to int
+                        lower_five_bits = to_signed_integer(int(register_b_in_binary[-5:], 2), 32)
+
+                        # add zeroes to the right of the subtring
+                        shifted_and_padded_substring = register_a_in_binary + ("0" * lower_five_bits)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+
+                    elif instruction == 'srl':
+                        # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift amount
+                        # held in the lower 5 bits of register rs2 and the result is placed in rd.
+                        # Zeros are shifted into the lower bits.
+
+                        # Get five lower bits
+                        lower_five_bits = to_signed_integer(int(register_b_in_binary[-5:], 2), 32)
+
+                        # remove the lower bits as required, then add zeroes to the left of the subtring (padding to 32 bits)
+                        shifted_and_padded_substring = register_a_in_binary[0: len(register_a_in_binary) - lower_five_bits].zfill(32)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+
+                    elif instruction == 'and':
+                        # AND is a logical operation that performs bitwise AND on registers rs1 and rs2
+                        # place the result in rd.
+
+                        result = register_a & register_b
+
+
+                    elif instruction == 'or':
+                        # OR is a logical operation that performs bitwise OR on registers
+                        # rs1 and rs2 place the result in rd
+                        result = register_a | register_b
+
+                    elif instruction == 'xor':
+                        # XOR is a logical operation that performs bitwise XOR on registers
+                        # rs1 and rs2 place the result in rd.
+                        result = register_a ^ register_b
+
+
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
+
+
                 elif six_to_zero == ALU_IMM_OPCODE:
 
+                    immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
 
-                    register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
-                    immediate_in_binary  = self.internal_registers_dict['ID/EX.IMM']['value']
-
-                    # Convert to two's complement
-                    register_a = int(register_a_in_binary, 2)
-                    register_a = to_signed_integer(register_a, 32)
                     imme = int(immediate_in_binary, 2)
                     imme = to_signed_integer(imme, 32)
 
@@ -1667,7 +1729,7 @@ lw x6, 2(x18)
     # x5, x0, 1
     sample_input =  """
 .text
-xori x5, x4, 0xFFFFFFFF
+xor x5, x4, x3
 
 """
 

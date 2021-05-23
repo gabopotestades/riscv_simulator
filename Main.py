@@ -1132,6 +1132,7 @@ class Main(tk.Frame):
 
         self.variables = {}
         self.jump_instructions = {}
+        self.current_pipeline_instructions = []
         self.current_data_segment = '0b000000000000' # 0x0000 in binary
         self.current_text_segment = '0b1000000000000' # 0x1000 in binary
         self.internal_registers_dict['PC']['value'] = self.current_text_segment
@@ -1258,7 +1259,7 @@ class Main(tk.Frame):
             s = bin(n & int("1"*bits, 2))[2:]
             return ("{0:0>%s}" % (bits)).format(s)
 
-        def to_signed_integer(integer, bit_size = 8):
+        def to_signed_integer(integer, bit_size = 32):
 
             unsigned = integer % 2**bit_size
 
@@ -1337,9 +1338,9 @@ class Main(tk.Frame):
                 self.internal_registers_dict['ID/EX.NPC']['value'] = self.internal_registers_dict['IF/ID.NPC']['value']
                 self.internal_registers_dict['ID/EX.IR']['value'] = self.internal_registers_dict['IF/ID.IR']['value']
 
-                if six_to_zero == '1100011': # branch
+                if six_to_zero == BRANCH_OPCODE: # branch
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five[0] + eleven_to_seven[4] + thirty_one_to_twenty_five[1:] + eleven_to_seven[0:4]
-                elif six_to_zero == '0100011': # sw
+                elif six_to_zero == SW_OPCODE: # sw
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + eleven_to_seven
                 else: # alu instruction or lw
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + twenty_four_to_twenty
@@ -1365,9 +1366,9 @@ class Main(tk.Frame):
 
                     # Convert to two's complement
                     register_a = int(self.internal_registers_dict['ID/EX.A']['value'], 2)
-                    register_a = to_signed_integer(register_a)
+                    register_a = to_signed_integer(register_a, 32)
                     imme = int(self.internal_registers_dict['ID/EX.IMM']['value'], 2)             
-                    imme = to_signed_integer(imme)
+                    imme = to_signed_integer(imme, 32)
 
                     # print(f'Register A: {register_a}')
                     # print(f'Immediate: {imme}')
@@ -1623,7 +1624,7 @@ if __name__ == "__main__":
 
     sample_input =  """
 .text
-addi x5, x0, -8
+addi x5, x0, 8
 """
 
     # endregion Declarables

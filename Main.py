@@ -58,7 +58,7 @@ class Main(tk.Frame):
             "MEM/WB.ALUOUTPUT": {"value": '0'},
             "MEM/MEMORY AFFECTED": {"value": '0'},
             "MEM/MEMORY VALUE": {"value": '0'},
-            
+
             "WB/REGISTER AFFECTED": {"value": '0'},
             "WB/REGISTER VALUE": {"value": '0'}
         }
@@ -67,8 +67,8 @@ class Main(tk.Frame):
             "x0": {"is_editable": False, "value": '0'},
             "x1": {"is_editable": True, "value": '0'},
             "x2": {"is_editable": True, "value": '0'},
-            "x3": {"is_editable": True, "value": '0'},
-            "x4": {"is_editable": True, "value": '0'},
+            "x3": {"is_editable": True, "value": '00000000000000000000000000001011'},
+            "x4": {"is_editable": True, "value": '00000000000000000000000000001000'},
             "x5": {"is_editable": True, "value": '0'},
             "x6": {"is_editable": True, "value": '0'},
             "x7": {"is_editable": True, "value": '0'},
@@ -238,7 +238,7 @@ class Main(tk.Frame):
                                                redraw=True,
                                                verify=False,
                                                reset_highlights=False)
-        
+
         with open('pipelinemap.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerows(list_version_of_pipeline_df)
@@ -695,7 +695,7 @@ class Main(tk.Frame):
             row_to_return['line_number'] = self.line_counter
             row_to_return['actual_command'] = actual_instruction
 
-            
+
             # Get the opcode and default rd, rs1 and rs2
             opcode = row_to_return['6-0'][2:].zfill(7)[::-1][0:7][::-1]
             row_to_return['rd'] = 'x' +  str(int(row_to_return['11-7'][2:], 2))
@@ -705,7 +705,7 @@ class Main(tk.Frame):
             # Handle special cases, reg-reg instruction is exempted
             if   opcode == '0000011': #lw
                 row_to_return['rs2'] = ''
-            elif opcode == '0100011': #sw 
+            elif opcode == '0100011': #sw
                 row_to_return['rd'] = ''
             elif opcode == '1100011': #branch
                 row_to_return['rd'] = ''
@@ -971,14 +971,14 @@ class Main(tk.Frame):
             # If first row, don't get the previous
             if opcode_index != 0:
                 previous_rows = self.binary_table_df.iloc[num_rows_lookback: opcode_index, :]
-                previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') & 
-                                                                ((previous_rows['rd'] == current_rs1) | 
+                previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') &
+                                                                ((previous_rows['rd'] == current_rs1) |
                                                                 (previous_rows['rd'] == current_rs2)) ]
 
             cycle_number = 1
             column_in_current_cycle = additional_columns + (len(self.binary_table_df.index))
             # Add columns per cycle to the row
-            while column_in_current_cycle > 0:       
+            while column_in_current_cycle > 0:
 
                 cell = ''
                 cycle_name = 'Cycle ' + str(cycle_number)
@@ -1002,7 +1002,7 @@ class Main(tk.Frame):
                             row_to_add[new_cycle] = ''
                             column_in_current_cycle += 1
                             additional_columns += 1
-                                       
+
                             previous_stalled = None
                             internal_counter -= 1
                             counter += 1
@@ -1012,7 +1012,7 @@ class Main(tk.Frame):
 
                         cell = 'ID'
 
-                        if previous_stalled == 'EX':                   
+                        if previous_stalled == 'EX':
                             previous_stalled = 'ID'
                             internal_counter -= 1
                             cell = '*'
@@ -1026,17 +1026,17 @@ class Main(tk.Frame):
                         if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
-                                
+
                                 address_of_dependency = row['address']
                                 current_row_with_dependency = self.pipeline_map_df[self.pipeline_map_df['address'] == address_of_dependency].reset_index(drop=True)
-                                
+
                                 if current_row_with_dependency.shape[0] > 0:
                                     current_row_with_dependency_rd = self.binary_table_df[self.binary_table_df['address'] == address_of_dependency].reset_index(drop=True)
                                     current_row_with_dependency_rd = current_row_with_dependency_rd['rd'][0]
-                                    
+
                                     current_row_with_dependency_opcode = current_row_with_dependency['opcode'][0]
                                     current_columns_of_row_with_dependency = current_row_with_dependency.columns
-                                
+
                                     step = None
                                     if current_row_with_dependency_opcode == LW_OPCODE and current_opcode != LW_OPCODE:
                                         step = 'MEM'
@@ -1046,7 +1046,7 @@ class Main(tk.Frame):
                                     elif current_row_with_dependency_opcode in [ALU_ALU_OPCODE, ALU_IMM_OPCODE] and \
                                         current_opcode in [SW_OPCODE, LW_OPCODE] and current_rs1 == current_row_with_dependency_rd:
                                         step = 'EX'
-                                    
+
                                     if step:
                                         for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
@@ -1055,28 +1055,28 @@ class Main(tk.Frame):
                                                     previous_stalled = step
                                                     internal_counter -= 1
                                                     cell = '*'
-                                                    
+
                     elif internal_counter == 4:
                         cell = 'MEM'
 
                         if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
-                                
+
                                 address_of_dependency = row['address']
                                 current_row_with_dependency = self.pipeline_map_df[self.pipeline_map_df['address'] == address_of_dependency].reset_index(drop=True)
-                                
+
                                 if current_row_with_dependency.shape[0] > 0:
                                     current_row_with_dependency_rd = self.binary_table_df[self.binary_table_df['address'] == address_of_dependency].reset_index(drop=True)
                                     current_row_with_dependency_rd = current_row_with_dependency_rd['rd'][0]
-                                    
+
                                     current_row_with_dependency_opcode = current_row_with_dependency['opcode'][0]
                                     current_columns_of_row_with_dependency = current_row_with_dependency.columns
-                                
+
                                     step = None
                                     if current_row_with_dependency_opcode == LW_OPCODE and current_rs1 == current_row_with_dependency_rd:
                                         step = 'MEM'
-                                    
+
                                     if step:
                                         for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
@@ -1093,18 +1093,18 @@ class Main(tk.Frame):
                             row_to_add[new_cycle] = ''
                             column_in_current_cycle += 1
                             additional_columns += 1
-                   
+
                     elif internal_counter == 5:
                         # print(f'{opcode_index}: Cycle Num: {cycle_number}, Stall: {stall_count}, Counter: {counter}')
 
                         cell = 'WB'
-                        
+
                     # if stall_count == 0:
                     internal_counter += 1
                     # else:
                     #     cell = '*'
                     #     stall_count -= 1
-                
+
                 # Add cycle to the row dictionary
                 row_to_add[cycle_name] = cell
                 cycle_number += 1
@@ -1267,12 +1267,12 @@ class Main(tk.Frame):
                 signed = unsigned - 2**bit_size
             else:
                 signed = unsigned
-            
+
             return signed
-        
+
         # Add pipeline cycle instructions to list to be executed
         for column in self.pipeline_map_df.columns[3:]:
-            for cell in self.pipeline_map_df[column]:            
+            for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
         self.print_formatted_table()
@@ -1292,7 +1292,7 @@ class Main(tk.Frame):
 
         # Iterate through each cycle instruction in the pipeline map
         for cycle_instruction in self.current_pipeline_instructions:
-            
+
             if cycle_instruction == '*':
                 continue
 
@@ -1300,7 +1300,7 @@ class Main(tk.Frame):
 
                 pc_row = self.binary_table_df[(self.binary_table_df['address'] == self.internal_registers_dict['PC']['value'])].reset_index(drop=True)
                 instruction = pc_row['instruction'][0]
-            
+
                 thirty_one_to_twenty_five = pc_row['31-25'][0][2:].zfill(7)[::-1][0:7][::-1]
                 twenty_four_to_twenty = pc_row['24-20'][0][2:].zfill(5)[::-1][0:5][::-1]
                 nineteen_to_fifteen = pc_row['19-15'][0][2:].zfill(5)[::-1][0:5][::-1]
@@ -1319,8 +1319,8 @@ class Main(tk.Frame):
                 else:
                     self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
                     self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
-                
-                print(f"Cycle: {cycle_instruction}") 
+
+                print(f"Cycle: {cycle_instruction}")
                 print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
                 print(f"PC: {self.internal_registers_dict['PC']['value']}")
                 print('=' * 100)
@@ -1332,7 +1332,7 @@ class Main(tk.Frame):
                 register_b = 'x' + str(int(twenty_four_to_twenty, 2))
                 register_a = self.registers_dict[register_a]['value'] # in binary
                 register_b = self.registers_dict[register_b]['value'] # in binary
-                
+
                 self.internal_registers_dict['ID/EX.A']['value'] = register_a
                 self.internal_registers_dict['ID/EX.B']['value'] = register_b
                 self.internal_registers_dict['ID/EX.NPC']['value'] = self.internal_registers_dict['IF/ID.NPC']['value']
@@ -1344,51 +1344,152 @@ class Main(tk.Frame):
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + eleven_to_seven
                 else: # alu instruction or lw
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + twenty_four_to_twenty
-                
-                print(f"Cycle: {cycle_instruction}") 
+
+                print(f"Cycle: {cycle_instruction}")
                 print(f"A: {self.internal_registers_dict['ID/EX.A']['value']}")
                 print(f"B: {self.internal_registers_dict['ID/EX.B']['value']}")
-                print(f"NPC: {self.internal_registers_dict['ID/EX.NPC']['value']}") 
+                print(f"NPC: {self.internal_registers_dict['ID/EX.NPC']['value']}")
                 # print(f"IR: {self.internal_registers_dict['ID/EX.IR']['value']}")
                 print(f"IMM: {self.internal_registers_dict['ID/EX.IMM']['value']}")
                 print('=' * 100)
 
             elif cycle_instruction == 'EX':
-                
+
                 self.internal_registers_dict['EX/MEM.IR']['value'] = self.internal_registers_dict['ID/EX.IR']['value']
                 self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
                 self.internal_registers_dict['EX/MEM.COND']['value'] = '0'
                 result = 0
 
+                register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
+                register_b_in_binary = self.internal_registers_dict['ID/EX.B']['value']
+
+                # Convert to two's complement
+                register_a = int(register_a_in_binary, 2)
+                register_a = to_signed_integer(register_a, 32)
+
+                register_b = int(register_b_in_binary, 2)
+                register_b = to_signed_integer(register_b, 32)
+
                 if six_to_zero == ALU_ALU_OPCODE:
-                    pass
+                    if instruction == 'add':
+                        # performs addition of rs1 and rs2. Arithmetic overflow is ignored,
+                        # and the low 32 bits of the result is written in rd.
+                        result = register_a + register_b
+                    elif instruction == 'slt':
+                        # SLT (set if less than) performs signed compare, places the value 1 in
+                        # register rd if register rs1 < rs2, 0 otherwise.
+                        result = 1 if register_a < register_b else 0
+                    elif instruction == 'sll':
+                        # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift
+                        # amount held in the lower 5 bits of register rs2 and the result is placed in rd.
+                        # Zeros are shifted into the lower bits.
+
+
+                        # Get five lower bits and cast to int
+                        lower_five_bits = to_signed_integer(int(register_b_in_binary[-5:], 2), 32)
+
+                        # add zeroes to the right of the subtring
+                        shifted_and_padded_substring = register_a_in_binary + ("0" * lower_five_bits)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+
+                    elif instruction == 'srl':
+                        # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift amount
+                        # held in the lower 5 bits of register rs2 and the result is placed in rd.
+                        # Zeros are shifted into the lower bits.
+
+                        # Get five lower bits
+                        lower_five_bits = to_signed_integer(int(register_b_in_binary[-5:], 2), 32)
+
+                        # remove the lower bits as required, then add zeroes to the left of the subtring (padding to 32 bits)
+                        shifted_and_padded_substring = register_a_in_binary[0: len(register_a_in_binary) - lower_five_bits].zfill(32)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+
+                    elif instruction == 'and':
+                        # AND is a logical operation that performs bitwise AND on registers rs1 and rs2
+                        # place the result in rd.
+
+                        result = register_a & register_b
+
+
+                    elif instruction == 'or':
+                        # OR is a logical operation that performs bitwise OR on registers
+                        # rs1 and rs2 place the result in rd
+                        result = register_a | register_b
+
+                    elif instruction == 'xor':
+                        # XOR is a logical operation that performs bitwise XOR on registers
+                        # rs1 and rs2 place the result in rd.
+                        result = register_a ^ register_b
+
+
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
+
+
                 elif six_to_zero == ALU_IMM_OPCODE:
 
-                    # Convert to two's complement
-                    register_a = int(self.internal_registers_dict['ID/EX.A']['value'], 2)
-                    register_a = to_signed_integer(register_a, 32)
-                    imme = int(self.internal_registers_dict['ID/EX.IMM']['value'], 2)             
+                    immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
+
+                    imme = int(immediate_in_binary, 2)
                     imme = to_signed_integer(imme, 32)
 
                     # print(f'Register A: {register_a}')
                     # print(f'Immediate: {imme}')
 
                     if instruction == 'addi':
-                        
                         result = register_a + imme
-
                     elif instruction == 'slti':
-                        pass
+                        # SLTI (set if less than) places the value 1 in register rd if register rs1 is less than
+                        # the sign extended immediate when both are treated as signed
+                        # integers; else 0 is written to rd.
+                        result = 1 if register_a < imme else 0
                     elif instruction == 'slli':
-                        pass
+                        # SLLI (shift left logical immediate) -
+                        # the operand to be shifted is in rs1 and
+                        # the shift amount is encoded in the lower 5
+                        # bits of the immediate field and the result is
+                        # placed in rd. Zeros are shifted into the lower bits.
+
+                        # Get five lower bits and cast to int
+                        lower_five_bits = to_signed_integer(int(immediate_in_binary[-5:], 2), 32)
+
+                        # add zeroes to the right of the subtring
+                        shifted_and_padded_substring = register_a_in_binary + ("0" * lower_five_bits)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
                     elif instruction == 'srli':
-                        pass
+                        # SRLI (shift right logical immediate)- the operand to be shifted is in rs1 and the shift amount
+                        # is encoded in the lower 5 bits of the immediate field and the result is placed in rd.
+                        # Zeros are shifted into the upper bits.
+
+                        # Get five lower bits
+                        lower_five_bits = to_signed_integer(int(immediate_in_binary[-5:], 2), 32)
+
+                        # remove the lower bits as required, then add zeroes to the left of the subtring (padding to 32 bits)
+                        shifted_and_padded_substring = register_a_in_binary[0: len(register_a_in_binary) - lower_five_bits].zfill(32)
+
+                        # only get the last 32 bits
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+
                     elif instruction == 'andi':
-                        pass
+                        # ANDI is a logical operation that
+                        # performs bitwise AND on
+                        # register rs1 and the sign- extended 12-bit immediate, place the result in rd.
+                        result = register_a & to_signed_integer(int(immediate_in_binary, 2), 12)
+
                     elif instruction == 'ori':
-                        pass
+                        # ORI is a logical operation that performs bitwise OR on register rs1 and
+                        # the sign- extended 12-bit immediate place the result in rd.
+                        result = register_a | to_signed_integer(int(immediate_in_binary, 2), 12)
+
                     elif instruction == 'xori':
-                        pass
+                        # XORI is a logical operation that performs bitwise XOR on register rs1 and
+                        # the sign- extended 12-bit immediate place the result in rd.
+                        result = register_a ^ to_signed_integer(int(immediate_in_binary, 2), 12)
 
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
 
@@ -1410,7 +1511,7 @@ class Main(tk.Frame):
                 self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = '0'
                 self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = '0'
 
-                       
+
                 if six_to_zero in [ALU_ALU_OPCODE, ALU_IMM_OPCODE]:
                     self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
@@ -1423,7 +1524,7 @@ class Main(tk.Frame):
                 elif six_to_zero == LW_OPCODE:
                     self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = '' # aayusin pa
-                
+
 
                 print(f"Cycle: {cycle_instruction}")
                 print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
@@ -1585,36 +1686,36 @@ if __name__ == "__main__":
 # xor x6, x5, x6
 # and x8, x6, x6
 # beq x0, x0, FIN
-# L1: 
+# L1:
 # sll x7, x5, x6
 # srl x8, x5, x6
-# FIN: 
+# FIN:
 # addi x0, x0, 0
 # lw x1, 3(x15)
 # addi x2, x1, 33
 # sw x2, 4(x13)
 # """
 
-#     sample_input =  """
-# .data
-# var1: .word 6
-# x: .word 0x0ff
-# .text
-# addi x5, x0, 8
-# addi x6, x0, 4
-# BLT x5, x6, L1
-# L1: 
-# addi x0, x0, 0
-# lw x1, 3(x15)
-# addi x2, x1, 33
-# lw x6, 4(x2)
-# sw x2, 4(x13)
-# lw x6, 55
-# addi x18, x6, 4
-# lw x6, 2(x18)
-# """
+    sample_input =  """
+.data
+var1: .word 6
+x: .word 0x0ff
+.text
+addi x5, x0, 8
+addi x6, x0, 4
+BLT x5, x6, L1
+L1: 
+addi x0, x0, 0
+lw x1, 3(x15)
+addi x2, x1, 33
+lw x6, 4(x2)
+sw x2, 4(x13)
+lw x6, 55
+addi x18, x6, 4
+lw x6, 2(x18)
+"""
 
-#     sample_input =  """
+# sample_input =  """
 # .text
 # addi x5, x0, 8
 # beq x5, x3, l1
@@ -1622,9 +1723,14 @@ if __name__ == "__main__":
 # add x3, x4, x5
 # """
 
+    # addi
+    # x5, x0, 8
+    # slti
+    # x5, x0, 1
     sample_input =  """
 .text
-addi x5, x0, 8
+xor x5, x4, x3
+
 """
 
     # endregion Declarables

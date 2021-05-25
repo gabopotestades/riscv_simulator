@@ -71,7 +71,7 @@ class Main(tk.Frame):
             "x3": {"is_editable": True, "value": '00000000000000000000000000001010'},
             "x4": {"is_editable": True, "value": '00000000000000000000000000001001'},
             "x5": {"is_editable": True, "value": '0'},
-            "x6": {"is_editable": True, "value": '0'},
+            "x6": {"is_editable": True, "value": '00000000000000000000000000001000'},
             "x7": {"is_editable": True, "value": '0'},
             "x8": {"is_editable": True, "value": '0'},
             "x9": {"is_editable": True, "value": '0'},
@@ -1500,10 +1500,18 @@ class Main(tk.Frame):
 
                 elif six_to_zero == BRANCH_OPCODE:
                     pass
-                elif six_to_zero == SW_OPCODE:
-                    pass
-                elif six_to_zero == LW_OPCODE:
-                    pass
+                elif six_to_zero in [SW_OPCODE, LW_OPCODE]:
+                    immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
+
+                    # Store instruction copy the value in register rs2 to memory.
+                    # Effective address is obtained by adding register rs to the sign-extended 12-bit offset.
+
+
+                    # Even though switched ung destination and source, ginaya ko nalang notion formula mo
+                    if instruction in ['sw', 'lw']:
+                        self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + to_signed_integer(
+                            int(immediate_in_binary, 2), 12), 32)
+                        self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
 
                 print(f"Cycle: {cycle_instruction}")
                 print(f"COND: {self.internal_registers_dict['EX/MEM.COND']['value']}")
@@ -1524,12 +1532,19 @@ class Main(tk.Frame):
                     self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
                 elif six_to_zero == SW_OPCODE:
-                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '' # aayusin pa
+                    # should be what's inside this address, eto muna until ma check
+                    # pero basically just access self.data_segment_dict
+                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
+                    # not sure with this
+                    self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                 elif six_to_zero == LW_OPCODE:
                     self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '' # aayusin pa
-
+                    # should be what's inside this address, eto muna until ma check
+                    # pero basically just access self.data_segment_dict
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
+                    # not sure with this
+                    self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
 
                 print(f"Cycle: {cycle_instruction}")
                 print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
@@ -1734,8 +1749,7 @@ lw x6, 2(x18)
     # x5, x0, 1
     sample_input =  """
 .text
-slli x5, x4, 31
-
+lw x10, 2(x6)
 """
 
     # endregion Declarables

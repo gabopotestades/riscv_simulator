@@ -34,6 +34,7 @@ class Main(tk.Frame):
         self.test = test_flag # Boolean for testing outputs
         self.is_data = False
         self.is_text = False
+        self.parsing_passed = True
         self.line_counter = 1
         self.edit_text = None
         self.terminal_text = None
@@ -67,8 +68,8 @@ class Main(tk.Frame):
             "x0": {"is_editable": False, "value": '0'},
             "x1": {"is_editable": True, "value": '0'},
             "x2": {"is_editable": True, "value": '0'},
-            "x3": {"is_editable": True, "value": '00000000000000000000000000001011'},
-            "x4": {"is_editable": True, "value": '00000000000000000000000000001000'},
+            "x3": {"is_editable": True, "value": '00000000000000000000000000001010'},
+            "x4": {"is_editable": True, "value": '00000000000000000000000000001001'},
             "x5": {"is_editable": True, "value": '0'},
             "x6": {"is_editable": True, "value": '0'},
             "x7": {"is_editable": True, "value": '0'},
@@ -128,7 +129,9 @@ class Main(tk.Frame):
         self.create_widgets()
 
         self.evaluate()
-        self.execute()
+
+        if self.parsing_passed:
+            self.execute()
 
     def repopulate_register_ui(self):
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
@@ -1125,7 +1128,7 @@ class Main(tk.Frame):
         list_of_commands = string_to_eval.splitlines()
 
         # Reset all parameters
-        parsing_passed = True
+        self.parsing_passed = True
         self.line_counter = 1
         self.is_data = False
         self.is_text = True
@@ -1154,7 +1157,6 @@ class Main(tk.Frame):
                 match_regex = re.match(command['regex'], formatted_command)
 
                 if match_regex:
-
                     if self.is_text:
                         row_to_add = self.parse_instruction(key, match_regex.groups(), formatted_command, True)
                         self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
@@ -1204,7 +1206,7 @@ class Main(tk.Frame):
 
                 if msg != None:
                     self.print_in_terminal(msg)
-                    parsing_passed = False
+                    self.parsing_passed = False
                     break
 
             else:
@@ -1215,20 +1217,20 @@ class Main(tk.Frame):
 
             self.line_counter += 1
 
-        if parsing_passed:
+        if self.parsing_passed:
             # Populate pending jumps
             has_error = self.populate_pending_jumps()
             if has_error:
                 self.print_in_terminal(has_error)
-                parsing_passed = False
+                self.parsing_passed = False
 
             # Populate pending variables
             has_error = self.populate_pending_variables()
             if has_error:
                 self.print_in_terminal(has_error)
-                parsing_passed = False
+                self.parsing_passed = False
 
-        if parsing_passed:
+        if self.parsing_passed:
             if self.test:
                 self.print_in_terminal(results)
 
@@ -1434,18 +1436,20 @@ class Main(tk.Frame):
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
 
                     imme = int(immediate_in_binary, 2)
-                    imme = to_signed_integer(imme, 32)
+                    imme = to_signed_integer(imme, 12)
 
                     # print(f'Register A: {register_a}')
                     # print(f'Immediate: {imme}')
 
                     if instruction == 'addi':
                         result = register_a + imme
+                    
                     elif instruction == 'slti':
                         # SLTI (set if less than) places the value 1 in register rd if register rs1 is less than
                         # the sign extended immediate when both are treated as signed
                         # integers; else 0 is written to rd.
                         result = 1 if register_a < imme else 0
+                    
                     elif instruction == 'slli':
                         # SLLI (shift left logical immediate) -
                         # the operand to be shifted is in rs1 and
@@ -1460,7 +1464,8 @@ class Main(tk.Frame):
                         shifted_and_padded_substring = register_a_in_binary + ("0" * lower_five_bits)
 
                         # only get the last 32 bits
-                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)                    
+
                     elif instruction == 'srli':
                         # SRLI (shift right logical immediate)- the operand to be shifted is in rs1 and the shift amount
                         # is encoded in the lower 5 bits of the immediate field and the result is placed in rd.
@@ -1479,17 +1484,17 @@ class Main(tk.Frame):
                         # ANDI is a logical operation that
                         # performs bitwise AND on
                         # register rs1 and the sign- extended 12-bit immediate, place the result in rd.
-                        result = register_a & to_signed_integer(int(immediate_in_binary, 2), 12)
+                        result = register_a & imme
 
                     elif instruction == 'ori':
                         # ORI is a logical operation that performs bitwise OR on register rs1 and
                         # the sign- extended 12-bit immediate place the result in rd.
-                        result = register_a | to_signed_integer(int(immediate_in_binary, 2), 12)
+                        result = register_a | imme
 
                     elif instruction == 'xori':
                         # XORI is a logical operation that performs bitwise XOR on register rs1 and
                         # the sign- extended 12-bit immediate place the result in rd.
-                        result = register_a ^ to_signed_integer(int(immediate_in_binary, 2), 12)
+                        result = register_a ^ imme
 
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
 
@@ -1556,7 +1561,7 @@ if __name__ == "__main__":
 
     regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*((?!x(0|0?[1-9]|[12][0-9]|3[01]))[a-z_][\w]+|[-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)?(\(x(0|0?[1-9]|[12][0-9]|3[01])\))?$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
-    regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)$"
+    regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9][0-9]*|0x[a-f0-9]+)$"
     regex_branching_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"
 
     commands_dict = {
@@ -1729,7 +1734,7 @@ lw x6, 2(x18)
     # x5, x0, 1
     sample_input =  """
 .text
-xor x5, x4, x3
+slli x5, x4, 31
 
 """
 

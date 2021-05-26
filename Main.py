@@ -4,6 +4,7 @@ import sys
 import csv
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
+from numpy.core.fromnumeric import size
 from pandas.core.frame import DataFrame
 from pandas.core.generic import NDFrame
 from tksheet import Sheet
@@ -19,6 +20,9 @@ SW_OPCODE = '0100011'
 BRANCH_OPCODE = '1100011'
 ALU_ALU_OPCODE = '0110011'
 ALU_IMM_OPCODE = '0010011'
+
+# Address Limits
+DATA_SEGMENT_LIMIT = '0b11111111100'
 
 class Main(tk.Frame):
 
@@ -38,6 +42,7 @@ class Main(tk.Frame):
         self.line_counter = 1
         self.edit_text = None
         self.terminal_text = None
+
         self.internal_registers_dict = {
             "IF/ID.IR": {"value": '0'},
             "IF/ID.NPC": {"value": '0'},
@@ -76,7 +81,7 @@ class Main(tk.Frame):
             "x8": {"is_editable": True, "value": '0'},
             "x9": {"is_editable": True, "value": '0'},
             "x10": {"is_editable": True, "value": '0'},
-            "x11": {"is_editable": True, "value": '0'},
+            "x11": {"is_editable": True, "value": '00000000000000000000000000001100'},
             "x12": {"is_editable": True, "value": '0'},
             "x13": {"is_editable": True, "value": '0'},
             "x14": {"is_editable": True, "value": '0'},
@@ -101,7 +106,6 @@ class Main(tk.Frame):
 
 
         self.data_segment_dict = {
-            "000007FF": 0
         }
 
 
@@ -126,12 +130,14 @@ class Main(tk.Frame):
         self.labels_table = None
         self.data_segment_table = None
         self.text_segment_table = None
+
+        self.initialize_data_segment()
         self.create_widgets()
 
         self.evaluate()
-
         if self.parsing_passed:
             self.execute()
+
 
     def repopulate_register_ui(self):
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
@@ -195,7 +201,6 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
 
-
     def repopulate_labels_ui(self):
 
         list_version_of_labels_dict = []
@@ -247,7 +252,13 @@ class Main(tk.Frame):
             writer.writerows(list_version_of_pipeline_df)
 
 
-
+    def initialize_data_segment(self):
+        address = '0'
+        for x in range (0, 512):
+            self.data_segment_dict["{0:0>8X}".format(int(address, 2))] = '0'
+            address = hex(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+            address = bin(int(address,  16))
+        
     def create_widgets(self):
         # self.master.grid_columnconfigure(0, weight=1)
         # self.master.grid_rowconfigure(0, weight=1)
@@ -401,6 +412,7 @@ class Main(tk.Frame):
         self.repopulate_data_segment_ui()
         self.repopulate_pipeline_ui()
 
+
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
             print(f'{key}: {value}')
@@ -411,7 +423,6 @@ class Main(tk.Frame):
             address = value['address']
             print(f'{key}: Address - {address} | Value - {var_value}')
 
-    # Pad binary digits
     def print_formatted_table(self):
         print_df = self.binary_table_df.copy()
         print_df['address'] = print_df['address'].apply(lambda x: x[2:].zfill(16))
@@ -427,7 +438,6 @@ class Main(tk.Frame):
 
         print(print_df)
 
-    # Outputs to terminal the processed data
     def print_in_terminal(self, inputStr):
 
         # Enabled the terminal to insert text and disable again to make it readonly
@@ -446,6 +456,7 @@ class Main(tk.Frame):
 
             self.terminal_text.see("end")
             self.terminal_text.config(state="disabled")
+
 
     # Get return row on parsing of matched line
     def parse_instruction(self, instruction, matched_string, actual_instruction, is_command):
@@ -1042,7 +1053,11 @@ class Main(tk.Frame):
 
                                     step = None
                                     if current_row_with_dependency_opcode == LW_OPCODE and current_opcode != LW_OPCODE:
-                                        step = 'MEM'
+
+                                        if (current_opcode == SW_OPCODE and current_row_with_dependency_rd == current_rs1) or \
+                                            current_opcode != SW_OPCODE:
+                                            step = 'MEM'
+
                                     elif current_row_with_dependency_opcode in [ALU_ALU_OPCODE, ALU_IMM_OPCODE] and \
                                         current_opcode not in[LW_OPCODE, SW_OPCODE]:
                                         step = 'EX'
@@ -1277,20 +1292,15 @@ class Main(tk.Frame):
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
-        self.print_formatted_table()
-        print('*' * 100)
-        print('Jump Instructions: ')
-        self.print_jump_intructions()
-        print('*' * 100)
 
-        # Set variables for each part in the opcode
-        thirty_one_to_twenty_five = ''
-        twenty_four_to_twenty = ''
-        nineteen_to_fifteen = ''
-        fourteen_to_twelve = ''
-        eleven_to_seven = ''
-        six_to_zero = ''
-        instruction = ''
+        check_a_cycle  = True
+
+        if check_a_cycle:
+            self.print_formatted_table()
+            print('*' * 100)
+            print('Jump Instructions: ')
+            self.print_jump_intructions()
+            print('*' * 100)
 
         # Iterate through each cycle instruction in the pipeline map
         for cycle_instruction in self.current_pipeline_instructions:
@@ -1322,18 +1332,26 @@ class Main(tk.Frame):
                     self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
                     self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
 
-                print(f"Cycle: {cycle_instruction}")
-                print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
-                print(f"PC: {self.internal_registers_dict['PC']['value']}")
-                print('=' * 100)
+                if check_a_cycle:
+                    print(f"Cycle: {cycle_instruction}")
+                    print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
+                    print(f"PC: {self.internal_registers_dict['PC']['value']}")
+                    print('=' * 100)
 
             elif cycle_instruction == 'ID':
+
+                six_to_zero = self.internal_registers_dict['IF/ID.IR']['value'][::-1][0:7][::-1]
+                nineteen_to_fifteen = self.internal_registers_dict['IF/ID.IR']['value'][::-1][15:20][::-1]
+                twenty_four_to_twenty = self.internal_registers_dict['IF/ID.IR']['value'][::-1][20:25][::-1]
 
                 # Load rs1 and rs2
                 register_a = 'x' + str(int(nineteen_to_fifteen, 2))
                 register_b = 'x' + str(int(twenty_four_to_twenty, 2))
                 register_a = self.registers_dict[register_a]['value'] # in binary
                 register_b = self.registers_dict[register_b]['value'] # in binary
+
+                # print(f'19-15: {nineteen_to_fifteen}')
+                # print(f'24-20: {twenty_four_to_twenty}')
 
                 self.internal_registers_dict['ID/EX.A']['value'] = register_a
                 self.internal_registers_dict['ID/EX.B']['value'] = register_b
@@ -1347,19 +1365,21 @@ class Main(tk.Frame):
                 else: # alu instruction or lw
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + twenty_four_to_twenty
 
-                print(f"Cycle: {cycle_instruction}")
-                print(f"A: {self.internal_registers_dict['ID/EX.A']['value']}")
-                print(f"B: {self.internal_registers_dict['ID/EX.B']['value']}")
-                print(f"NPC: {self.internal_registers_dict['ID/EX.NPC']['value']}")
-                # print(f"IR: {self.internal_registers_dict['ID/EX.IR']['value']}")
-                print(f"IMM: {self.internal_registers_dict['ID/EX.IMM']['value']}")
-                print('=' * 100)
+                if check_a_cycle:
+                    print(f"Cycle: {cycle_instruction}")
+                    print(f"A: {self.internal_registers_dict['ID/EX.A']['value']}")
+                    print(f"B: {self.internal_registers_dict['ID/EX.B']['value']}")
+                    print(f"NPC: {self.internal_registers_dict['ID/EX.NPC']['value']}")
+                    # print(f"IR: {self.internal_registers_dict['ID/EX.IR']['value']}")
+                    print(f"IMM: {self.internal_registers_dict['ID/EX.IMM']['value']}")
+                    print('=' * 100)
 
             elif cycle_instruction == 'EX':
 
                 self.internal_registers_dict['EX/MEM.IR']['value'] = self.internal_registers_dict['ID/EX.IR']['value']
                 self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
                 self.internal_registers_dict['EX/MEM.COND']['value'] = '0'
+                six_to_zero = self.internal_registers_dict['ID/EX.IR']['value'][::-1][0:7][::-1]
                 result = 0
 
                 register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
@@ -1511,50 +1531,59 @@ class Main(tk.Frame):
                     if instruction in ['sw', 'lw']:
                         self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + to_signed_integer(
                             int(immediate_in_binary, 2), 12), 32)
-                        self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
 
-                print(f"Cycle: {cycle_instruction}")
-                print(f"COND: {self.internal_registers_dict['EX/MEM.COND']['value']}")
-                print(f"ALUOUTPUT: {self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']}")
-                print('=' * 100)
+                if check_a_cycle:
+                    print(f"Cycle: {cycle_instruction}")
+                    print(f"COND: {self.internal_registers_dict['EX/MEM.COND']['value']}")
+                    print(f"ALUOUTPUT: {self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']}")
+                    print('=' * 100)
 
             elif cycle_instruction == 'MEM':
 
+                six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]
                 self.internal_registers_dict['MEM/WB.IR']['value'] = self.internal_registers_dict['EX/MEM.IR']['value']
+                self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                 self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = '0'
                 self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = '0'
+                self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
 
+                if six_to_zero == SW_OPCODE:
 
-                if six_to_zero in [ALU_ALU_OPCODE, ALU_IMM_OPCODE]:
-                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
-                elif six_to_zero == BRANCH_OPCODE:
-                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
-                elif six_to_zero == SW_OPCODE:
-                    # should be what's inside this address, eto muna until ma check
-                    # pero basically just access self.data_segment_dict
-                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
-                    # not sure with this
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
+                    self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
+                    
                 elif six_to_zero == LW_OPCODE:
-                    self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = '0'
-                    # should be what's inside this address, eto muna until ma check
-                    # pero basically just access self.data_segment_dict
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
-                    # not sure with this
-                    self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
 
-                print(f"Cycle: {cycle_instruction}")
-                print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
-                print(f"LMD: {self.internal_registers_dict['MEM/WB.LMD']['value']}")
-                print(f"MEMORY AFFECTED: {self.internal_registers_dict['MEM/MEMORY AFFECTED']['value']}")
-                print(f"MEMORY VALUE: {self.internal_registers_dict['MEM/MEMORY VALUE']['value']}")
-                print('=' * 100)
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
+
+                if check_a_cycle:
+                    print(f"Cycle: {cycle_instruction}")
+                    print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
+                    print(f"LMD: {self.internal_registers_dict['MEM/WB.LMD']['value']}")
+                    print(f"MEMORY AFFECTED: {self.internal_registers_dict['MEM/MEMORY AFFECTED']['value']}")
+                    print(f"MEMORY VALUE: {self.internal_registers_dict['MEM/MEMORY VALUE']['value']}")
+                    print('=' * 100)
 
             elif cycle_instruction == 'WB':
-                pass
+
+                six_to_zero = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][0:7][::-1]
+                eleven_to_seven = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][7:12][::-1]
+
+                if six_to_zero == LW_OPCODE:
+
+                    self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
+                    self.internal_registers_dict['WB/REGISTER VALUE']['value'] = self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']
+
+                    if check_a_cycle:
+                        print(f"Cycle: {cycle_instruction}")
+                        print(f"REGISTER: {self.internal_registers_dict['WB/REGISTER AFFECTED']['value']}")
+                        print(f"VALUE: {self.internal_registers_dict['WB/REGISTER VALUE']['value']}")
+                        print('=' * 100)
+
+                else:
+                    self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
+                    self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
+
 
 if __name__ == "__main__":
 
@@ -1743,15 +1772,15 @@ lw x6, 2(x18)
 # add x3, x4, x5
 # """
 
-    # addi
-    # x5, x0, 8
-    # slti
-    # x5, x0, 1
     sample_input =  """
 .text
-lw x10, 2(x6)
+sw x4, 4(x11)
 """
 
+    sample_input =  """
+.text
+lw x4, 8(x11)
+"""
     # endregion Declarables
 
     root = tk.Tk()

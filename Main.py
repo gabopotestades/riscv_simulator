@@ -1319,7 +1319,7 @@ class Main(tk.Frame):
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
 
-        check_a_cycle  = True
+        check_a_cycle = False
 
         if check_a_cycle:
             self.print_formatted_table()
@@ -1406,6 +1406,7 @@ class Main(tk.Frame):
                 self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
                 self.internal_registers_dict['EX/MEM.COND']['value'] = '0'
                 six_to_zero = self.internal_registers_dict['ID/EX.IR']['value'][::-1][0:7][::-1]
+                eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]
                 result = 0
 
                 register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
@@ -1474,7 +1475,13 @@ class Main(tk.Frame):
                         result = register_a ^ register_b
 
 
-                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
+                    rd = 'x' + str(int(eleven_to_seven, 2))
+                    if rd == 'x0': result = 0
+                    result = twos_comp(result, 32)
+                    self.registers_dict[rd]['value'] = result # forwarding
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = result
+
+                    # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
 
 
                 elif six_to_zero == ALU_IMM_OPCODE:
@@ -1542,7 +1549,13 @@ class Main(tk.Frame):
                         # the sign- extended 12-bit immediate place the result in rd.
                         result = register_a ^ imme
 
-                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(result, 32)
+                    rd = 'x' + str(int(eleven_to_seven, 2))
+                    if rd == 'x0': result = 0
+                    result = twos_comp(result, 32)
+                    self.registers_dict[rd]['value'] = result # forwarding
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = result
+
+                    # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
 
                 elif six_to_zero == BRANCH_OPCODE:
                     pass
@@ -1595,10 +1608,14 @@ class Main(tk.Frame):
                 six_to_zero = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][7:12][::-1]
 
-                if six_to_zero == LW_OPCODE:
+                if six_to_zero in [LW_OPCODE,  ALU_ALU_OPCODE, ALU_IMM_OPCODE] :
 
-                    self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
-                    self.internal_registers_dict['WB/REGISTER VALUE']['value'] = self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']
+                    if six_to_zero == LW_OPCODE:
+                        self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
+                        self.internal_registers_dict['WB/REGISTER VALUE']['value'] = self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] # yung value ng address na ito
+                    else:
+                        self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
+                        self.internal_registers_dict['WB/REGISTER VALUE']['value'] = self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']
 
                     if check_a_cycle:
                         print(f"Cycle: {cycle_instruction}")
@@ -1805,7 +1822,8 @@ sw x4, 4(x11)
 
     sample_input =  """
 .text
-lw x4, 8(x11)
+add x10, x0, x6
+add x11, x10, x6
 """
     # endregion Declarables
 

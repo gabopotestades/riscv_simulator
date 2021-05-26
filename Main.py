@@ -167,8 +167,34 @@ class Main(tk.Frame):
 
     def repopulate_data_segment_ui(self):
         list_version_of_data_segment_dict = []
+
+        counter = 0
+
+        first = None
+        second = None
+        third = None
+        fourth = None
+
         for address, value in self.data_segment_dict.items():
-            list_version_of_data_segment_dict += [[address, value]]
+            counter += 1
+
+            if counter == 1:
+                first = value
+                ui_address = address
+            elif counter == 2:
+                second = value
+            elif counter == 3:
+                third = value
+            elif counter == 4:
+                fourth = value
+                counter = 0
+
+                first = "{0:0>2X}".format(int(first, 2))
+                second = "{0:0>2X}".format(int(second, 2))
+                third = "{0:0>2X}".format(int(third, 2))
+                fourth = "{0:0>2X}".format(int(fourth, 2))
+
+                list_version_of_data_segment_dict += [[ui_address, f"{fourth} | {third} | {second} | {first}"]]
 
         self.data_segment_table.set_sheet_data(data=list_version_of_data_segment_dict,
                                                      reset_col_positions=True,
@@ -256,9 +282,9 @@ class Main(tk.Frame):
         address = '0'
         for x in range (0, 512):
             self.data_segment_dict["{0:0>8X}".format(int(address, 2))] = '0'
-            address = hex(int(address, 2) + int ('100', 2)) # Increment by 4 current address
+            address = hex(int(address, 2) + int ('1', 2)) # Increment by 4 current address
             address = bin(int(address,  16))
-        
+
     def create_widgets(self):
         # self.master.grid_columnconfigure(0, weight=1)
         # self.master.grid_rowconfigure(0, weight=1)
@@ -1463,13 +1489,13 @@ class Main(tk.Frame):
 
                     if instruction == 'addi':
                         result = register_a + imme
-                    
+
                     elif instruction == 'slti':
                         # SLTI (set if less than) places the value 1 in register rd if register rs1 is less than
                         # the sign extended immediate when both are treated as signed
                         # integers; else 0 is written to rd.
                         result = 1 if register_a < imme else 0
-                    
+
                     elif instruction == 'slli':
                         # SLLI (shift left logical immediate) -
                         # the operand to be shifted is in rs1 and
@@ -1484,7 +1510,7 @@ class Main(tk.Frame):
                         shifted_and_padded_substring = register_a_in_binary + ("0" * lower_five_bits)
 
                         # only get the last 32 bits
-                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)                    
+                        result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
 
                     elif instruction == 'srli':
                         # SRLI (shift right logical immediate)- the operand to be shifted is in rs1 and the shift amount
@@ -1551,7 +1577,7 @@ class Main(tk.Frame):
 
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
-                    
+
                 elif six_to_zero == LW_OPCODE:
 
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']

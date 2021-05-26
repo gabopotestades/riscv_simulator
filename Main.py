@@ -81,7 +81,7 @@ class Main(tk.Frame):
             "x8": {"is_editable": True, "value": '0'},
             "x9": {"is_editable": True, "value": '0'},
             "x10": {"is_editable": True, "value": '0'},
-            "x11": {"is_editable": True, "value": '00000000000000000000000000001100'},
+            "x11": {"is_editable": True, "value": '10010001101001010101111001101'},
             "x12": {"is_editable": True, "value": '0'},
             "x13": {"is_editable": True, "value": '0'},
             "x14": {"is_editable": True, "value": '0'},
@@ -1558,6 +1558,8 @@ class Main(tk.Frame):
                         self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + to_signed_integer(
                             int(immediate_in_binary, 2), 12), 32)
 
+
+
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"COND: {self.internal_registers_dict['EX/MEM.COND']['value']}")
@@ -1578,9 +1580,53 @@ class Main(tk.Frame):
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
 
-                elif six_to_zero == LW_OPCODE:
+                    # actual writing in data segment
+                    # affected_memory_in_hex = "{0:0>8X}".format(
+                    #     int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2))
+                    #
 
+                    affected_memory = int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2)
+                    first_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('1', 2)))
+                    second_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('10', 2)))
+                    third_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('11', 2)))
+                    fourth_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('100', 2)))
+
+                    # value to save to data segment
+                    memory_value_in_hex = "{0:0>8X}".format(int(self.internal_registers_dict['MEM/MEMORY VALUE']['value'], 2))
+
+                    # Split into 4, two hex digit strings
+                    memory_value_splitted_into_four_two_hex_digits = [(memory_value_in_hex[i:i+2]) for i in range(0, len(memory_value_in_hex), 2)]
+
+                    self.data_segment_dict[first_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[3]
+                    self.data_segment_dict[second_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[2]
+                    self.data_segment_dict[third_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[1]
+                    self.data_segment_dict[fourth_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[0]
+
+                    print(f"Data segment memory to be changed: {first_affected_memory_in_hex}, {second_affected_memory_in_hex}, {third_affected_memory_in_hex}, {fourth_affected_memory_in_hex}")
+                    print(f"values: {memory_value_splitted_into_four_two_hex_digits}")
+                    #
+                    # # add checker : 0b11111111100
+                    # # 0000ABCD CD
+                    # # 0000ABCE AB
+                    # # 0000ABCF 11
+                    # # 0000ABD0 11
+                    #
+                    # # split this into 4
+                    # memory_value_in_hex = "{0:0>8X}".format(
+                    #     int(self.internal_registers_dict['MEM/MEMORY VALUE']['value'], 2))
+                    #
+                    # 11,11,AB,CD
+                    #
+                    # # do LW, write to register ung output
+                    #
+
+
+                    # self.data_segment_dict[affected_memory_in_hex] = memory_value_in_hex
+
+                elif six_to_zero == LW_OPCODE:
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
+                    register_to_update = 'x' + str(int(nineteen_to_fifteen, 2))
+                    self.registers_dict[register_to_update]['value'] = self.internal_registers_dict['MEM/WB.LMD']['value']
 
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
@@ -1606,10 +1652,16 @@ class Main(tk.Frame):
                         print(f"VALUE: {self.internal_registers_dict['WB/REGISTER VALUE']['value']}")
                         print('=' * 100)
 
+
+
+
                 else:
                     self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
 
+        self.repopulate_data_segment_ui()
+        print(self.registers_dict)
+        self.repopulate_register_ui()
 
 if __name__ == "__main__":
 
@@ -1805,7 +1857,7 @@ sw x4, 4(x11)
 
     sample_input =  """
 .text
-lw x4, 8(x11)
+lw x1, 0(x11)
 """
     # endregion Declarables
 

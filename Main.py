@@ -954,9 +954,13 @@ class Main(tk.Frame):
                     '14-12': row['14-12'],
                     '11-7': eleven_to_seven,
                     '6-0': row['6-0'],
+                    'actual_command': row['actual_command'],
+                    'line_number': row['line_number'],
                     'pending_jump': row['pending_jump'],
                     'pending_variable': None,
-                    'line_number': row['line_number']
+                    'rd': row['rd'],
+                    'rs1': row['rs1'],
+                    'rs2': row['rs2']
                 }
 
                 if self.test:
@@ -969,7 +973,8 @@ class Main(tk.Frame):
                     print("Before update:")
                     self.print_formatted_table()
 
-                self.binary_table_df.at[index] = row_to_return
+                for key, value in row_to_return.items():
+                    self.binary_table_df.at[index, key] = value
 
                 if self.test:
                     print("After update:")
@@ -987,6 +992,7 @@ class Main(tk.Frame):
         previous_stalled = None
         total_initial_cycles = 4 + (len(self.binary_table_df.index))
         self.pipeline_map_df = pd.DataFrame(columns=['address', 'instruction', 'opcode'])
+
 
         # Create columns for each clock cycle
         for cycle_number in range(1, total_initial_cycles):
@@ -1010,6 +1016,7 @@ class Main(tk.Frame):
             num_rows_lookback = opcode_index - 5 if opcode_index > 4 else 0
             current_opcode = current_row['6-0'][2:].zfill(7)[::-1][0:7][::-1]
             row_to_add = {'address': current_row['address'], 'instruction': current_row['actual_command'], 'opcode': current_opcode}
+
 
             # If first row, don't get the previous
             if opcode_index != 0:
@@ -1585,7 +1592,8 @@ class Main(tk.Frame):
 
             elif cycle_instruction == 'MEM':
 
-                six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]
+                six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]    
+                eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]
                 self.internal_registers_dict['MEM/WB.IR']['value'] = self.internal_registers_dict['EX/MEM.IR']['value']
                 self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                 self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = '0'
@@ -1596,7 +1604,6 @@ class Main(tk.Frame):
 
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
-
 
                     affected_memory = int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2)
 
@@ -1626,9 +1633,32 @@ class Main(tk.Frame):
                     # print(f"values: {memory_value_splitted_into_four_two_hex_digits}")
 
                 elif six_to_zero == LW_OPCODE:
-                    self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
-                    register_to_update = 'x' + str(int(nineteen_to_fifteen, 2))
-                    self.registers_dict[register_to_update]['value'] = self.internal_registers_dict['MEM/WB.LMD']['value']
+                    
+                    register_to_update = 'x' + str(int(eleven_to_seven, 2))
+                    address_of_data_from_memory = int(self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'], 2)
+
+                    # Get the 4 address based on the ALUOUTPUT
+                    first_address_of_data = "{0:0>8X}".format(address_of_data_from_memory)
+                    second_address_of_data = "{0:0>8X}".format((address_of_data_from_memory + int('1', 2)))
+                    third_address_of_data = "{0:0>8X}".format((address_of_data_from_memory + int('10', 2)))
+                    forth_address_of_data = "{0:0>8X}".format((address_of_data_from_memory + int('11', 2)))
+
+                    # Get the data from memory using data
+                    first_data = self.data_segment_dict[first_address_of_data]
+                    second_data = self.data_segment_dict[second_address_of_data]
+                    third_data = self.data_segment_dict[third_address_of_data]
+                    forth_data = self.data_segment_dict[forth_address_of_data]
+                    data_to_loaded_to_lmd = bin(int(forth_data + third_data + second_data + first_data, 16))[2:]
+
+                    # print(f'1st data: {first_data}')
+                    # print(f'2nd data: {second_data}')
+                    # print(f'3rd data: {third_data}')
+                    # print(f'4th data: {forth_data}')
+                    # print(f'Register to update: {register_to_update}')
+                    # print(f'LMD data in binary: {data_to_loaded_to_lmd}')
+
+                    self.internal_registers_dict['MEM/WB.LMD']['value'] = data_to_loaded_to_lmd
+                    self.registers_dict[register_to_update]['value'] = data_to_loaded_to_lmd
 
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
@@ -1662,9 +1692,9 @@ class Main(tk.Frame):
                     self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
 
-                    self.repopulate_data_segment_ui()
-                    # print(self.registers_dict)
-                    self.repopulate_register_ui()
+                self.repopulate_data_segment_ui()
+                # print(self.registers_dict)
+                self.repopulate_register_ui()
 
 if __name__ == "__main__":
 
@@ -1859,7 +1889,12 @@ var: .word 333
 var2: .word 999
 .text
 sw x5, var2(x11)
+beq x10, x11, l1
 lw x6, var2(x11)
+l1:
+sw x10, (x0)
+.data
+
 """
     # endregion Declarables
 

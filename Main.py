@@ -22,7 +22,7 @@ ALU_ALU_OPCODE = '0110011'
 ALU_IMM_OPCODE = '0010011'
 
 # Address Limits
-DATA_SEGMENT_LIMIT = '0b11111111100'
+DATA_SEGMENT_LIMIT = '11111111100'
 
 class Main(tk.Frame):
 
@@ -39,6 +39,7 @@ class Main(tk.Frame):
         self.is_data = False
         self.is_text = False
         self.parsing_passed = True
+        self.runtime_passed = True
         self.line_counter = 1
         self.edit_text = None
         self.terminal_text = None
@@ -75,13 +76,13 @@ class Main(tk.Frame):
             "x2": {"is_editable": True, "value": '0'},
             "x3": {"is_editable": True, "value": '00000000000000000000000000001010'},
             "x4": {"is_editable": True, "value": '00000000000000000000000000001001'},
-            "x5": {"is_editable": True, "value": '0'},
+            "x5": {"is_editable": True, "value": '10010001101001010101111001101'},
             "x6": {"is_editable": True, "value": '00000000000000000000000000001000'},
             "x7": {"is_editable": True, "value": '0'},
             "x8": {"is_editable": True, "value": '0'},
             "x9": {"is_editable": True, "value": '0'},
             "x10": {"is_editable": True, "value": '0'},
-            "x11": {"is_editable": True, "value": '10010001101001010101111001101'},
+            "x11": {"is_editable": True, "value": '11100'},
             "x12": {"is_editable": True, "value": '0'},
             "x13": {"is_editable": True, "value": '0'},
             "x14": {"is_editable": True, "value": '0'},
@@ -189,10 +190,10 @@ class Main(tk.Frame):
                 fourth = value
                 counter = 0
 
-                first = "{0:0>2X}".format(int(first, 2))
-                second = "{0:0>2X}".format(int(second, 2))
-                third = "{0:0>2X}".format(int(third, 2))
-                fourth = "{0:0>2X}".format(int(fourth, 2))
+                first = "{0:0>2X}".format(int(first, 16))
+                second = "{0:0>2X}".format(int(second, 16))
+                third = "{0:0>2X}".format(int(third, 16))
+                fourth = "{0:0>2X}".format(int(fourth, 16))
 
                 list_version_of_data_segment_dict += [[ui_address, f"{fourth} | {third} | {second} | {first}"]]
 
@@ -574,21 +575,23 @@ class Main(tk.Frame):
                 # Old way of computing immediate value for opcode
                 # immediate = '0' if matched_string[2] == '' else matched_string[2]
                 variable_name = matched_string[2]
-
                 pending_variable_name = None
-                if variable_name[0:2] == '0x':
-                    immediate = bin(int(variable_name, 16))[2:].zfill(12)
-                elif represents_int(variable_name):
-                    var_as_int = int(variable_name)
-                    if var_as_int > -1:
-                        immediate = bin(int(variable_name))[2:].zfill(12)
+                if variable_name:
+                    if variable_name[0:2] == '0x':
+                        immediate = bin(int(variable_name, 16))[2:].zfill(12)
+                    elif represents_int(variable_name):
+                        var_as_int = int(variable_name)
+                        if var_as_int > -1:
+                            immediate = bin(int(variable_name))[2:].zfill(12)
+                        else:
+                            immediate = bin(var_as_int & 0xfff)[2:] #for two's complement
+                    elif variable_name in self.variables.keys():
+                        immediate = self.variables[variable_name]['address']
                     else:
-                        immediate = bin(var_as_int & 0xfff)[2:] #for two's complement
-                elif variable_name in self.variables.keys():
-                    immediate = self.variables[variable_name]['address']
+                        # Kapag wala sa listahan, zero muna
+                        pending_variable_name = variable_name
+                        immediate = bin(0)[2:].zfill(12)
                 else:
-                    # Kapag wala sa listahan, zero muna
-                    pending_variable_name = variable_name
                     immediate = bin(0)[2:].zfill(12)
 
                 immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
@@ -1170,6 +1173,7 @@ class Main(tk.Frame):
 
         # Reset all parameters
         self.parsing_passed = True
+        self.runtime_passed = True
         self.line_counter = 1
         self.is_data = False
         self.is_text = True
@@ -1593,16 +1597,19 @@ class Main(tk.Frame):
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
 
-                    # actual writing in data segment
-                    # affected_memory_in_hex = "{0:0>8X}".format(
-                    #     int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2))
-                    #
 
                     affected_memory = int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2)
-                    first_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('1', 2)))
-                    second_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('10', 2)))
-                    third_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('11', 2)))
-                    fourth_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('100', 2)))
+
+                    if affected_memory > int(DATA_SEGMENT_LIMIT, 2):
+                        error_message = 'Runtime Error: Address is greater than the data segment limit.'
+                        self.print_in_terminal(error_message)
+                        self.runtime_passed = False
+                        break 
+
+                    first_affected_memory_in_hex = "{0:0>8X}".format(affected_memory)
+                    second_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('1', 2)))
+                    third_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('10', 2)))
+                    fourth_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('11', 2)))
 
                     # value to save to data segment
                     memory_value_in_hex = "{0:0>8X}".format(int(self.internal_registers_dict['MEM/MEMORY VALUE']['value'], 2))
@@ -1615,26 +1622,8 @@ class Main(tk.Frame):
                     self.data_segment_dict[third_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[1]
                     self.data_segment_dict[fourth_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[0]
 
-                    print(f"Data segment memory to be changed: {first_affected_memory_in_hex}, {second_affected_memory_in_hex}, {third_affected_memory_in_hex}, {fourth_affected_memory_in_hex}")
-                    print(f"values: {memory_value_splitted_into_four_two_hex_digits}")
-                    #
-                    # # add checker : 0b11111111100
-                    # # 0000ABCD CD
-                    # # 0000ABCE AB
-                    # # 0000ABCF 11
-                    # # 0000ABD0 11
-                    #
-                    # # split this into 4
-                    # memory_value_in_hex = "{0:0>8X}".format(
-                    #     int(self.internal_registers_dict['MEM/MEMORY VALUE']['value'], 2))
-                    #
-                    # 11,11,AB,CD
-                    #
-                    # # do LW, write to register ung output
-                    #
-
-
-                    # self.data_segment_dict[affected_memory_in_hex] = memory_value_in_hex
+                    # print(f"Data segment memory to be changed: {first_affected_memory_in_hex}, {second_affected_memory_in_hex}, {third_affected_memory_in_hex}, {fourth_affected_memory_in_hex}")
+                    # print(f"values: {memory_value_splitted_into_four_two_hex_digits}")
 
                 elif six_to_zero == LW_OPCODE:
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
@@ -1669,16 +1658,13 @@ class Main(tk.Frame):
                         print(f"VALUE: {self.internal_registers_dict['WB/REGISTER VALUE']['value']}")
                         print('=' * 100)
 
-
-
-
                 else:
                     self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
 
-        self.repopulate_data_segment_ui()
-        print(self.registers_dict)
-        self.repopulate_register_ui()
+                    self.repopulate_data_segment_ui()
+                    # print(self.registers_dict)
+                    self.repopulate_register_ui()
 
 if __name__ == "__main__":
 
@@ -1840,24 +1826,24 @@ if __name__ == "__main__":
 # sw x2, 4(x13)
 # """
 
-    sample_input =  """
-.data
-var1: .word 6
-x: .word 0x0ff
-.text
-addi x5, x0, 8
-addi x6, x0, 4
-BLT x5, x6, L1
-L1: 
-addi x0, x0, 0
-lw x1, 3(x15)
-addi x2, x1, 33
-lw x6, 4(x2)
-sw x2, 4(x13)
-lw x6, 55
-addi x18, x6, 4
-lw x6, 2(x18)
-"""
+#     sample_input =  """
+# .data
+# var1: .word 6
+# x: .word 0x0ff
+# .text
+# addi x5, x0, 8
+# addi x6, x0, 4
+# BLT x5, x6, L1
+# L1: 
+# addi x0, x0, 0
+# lw x1, 3(x15)
+# addi x2, x1, 33
+# lw x6, 4(x2)
+# sw x2, 4(x13)
+# lw x6, 55
+# addi x18, x6, 4
+# lw x6, 2(x18)
+# """
 
 # sample_input =  """
 # .text
@@ -1868,13 +1854,12 @@ lw x6, 2(x18)
 # """
 
     sample_input =  """
+.data
+var: .word 333
+var2: .word 999
 .text
-sw x4, 4(x11)
-"""
-
-    sample_input =  """
-.text
-lw x1, 0(x11)
+sw x5, var2(x11)
+lw x6, var2(x11)
 """
     # endregion Declarables
 

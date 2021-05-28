@@ -4,9 +4,6 @@ import sys
 import csv
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
-from numpy.core.fromnumeric import size
-from pandas.core.frame import DataFrame
-from pandas.core.generic import NDFrame
 from tksheet import Sheet
 import pandas as pd
 pd.set_option('display.max_rows', None)
@@ -644,6 +641,7 @@ class Main(tk.Frame):
 
                     # Offset = jump instruction address - current address divided by 2
                     immediate = (int(self.jump_instructions[jump_inst], 2) - int(self.current_text_segment, 2)) // 2
+                    pending_jump_name = jump_inst
 
                     original_binary = bin(immediate & 0xfff)[2:]
 
@@ -900,7 +898,7 @@ class Main(tk.Frame):
                 # New way of updating
                 self.binary_table_df.at[index, "31-25"] = thirtyone_to_twentyfive
                 self.binary_table_df.at[index, "11-7"] = eleven_to_seven
-                self.binary_table_df.at[index, "pending_jump"] = None
+                # self.binary_table_df.at[index, "pending_jump"] = None
 
 
                 if self.test:
@@ -1329,8 +1327,13 @@ class Main(tk.Frame):
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
-
+        address_to_branch = ''
         check_a_cycle = False
+        will_jump = False
+        if_instruction = None
+        id_instruction = None
+        if_branch = None
+        id_branch = None
 
         if check_a_cycle:
             self.print_formatted_table()
@@ -1348,7 +1351,8 @@ class Main(tk.Frame):
             if cycle_instruction == 'IF':
 
                 pc_row = self.binary_table_df[(self.binary_table_df['address'] == self.internal_registers_dict['PC']['value'])].reset_index(drop=True)
-                instruction = pc_row['instruction'][0]
+                if_instruction = pc_row['instruction'][0]
+                if_branch = pc_row['pending_jump'][0]
 
                 thirty_one_to_twenty_five = pc_row['31-25'][0][2:].zfill(7)[::-1][0:7][::-1]
                 twenty_four_to_twenty = pc_row['24-20'][0][2:].zfill(5)[::-1][0:5][::-1]
@@ -1360,16 +1364,18 @@ class Main(tk.Frame):
                 concatenated = thirty_one_to_twenty_five + twenty_four_to_twenty + nineteen_to_fifteen + fourteen_to_twelve + eleven_to_seven + six_to_zero
 
                 self.internal_registers_dict['IF/ID.IR']['value'] = concatenated # Load the opcode in binary
+                self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
+                self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
 
-                # If will branch
-                if self.internal_registers_dict['EX/MEM.COND']['value'] == '1' and self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] in self.jump_instructions.values():
-                    self.internal_registers_dict['PC']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']
-                    self.internal_registers_dict['IF/ID.NPC']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']
-                else:
-                    self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
-                    self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
+                # Old branch checking
+                # if self.internal_registers_dict['EX/MEM.COND']['value'] == '1' and self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] in self.jump_instructions.values():
+                #     self.internal_registers_dict['PC']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']
+                #     self.internal_registers_dict['IF/ID.NPC']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']
+                # else:
+                #     self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
+                #     self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
 
-                if check_a_cycle:
+                if not check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
                     print(f"PC: {self.internal_registers_dict['PC']['value']}")
@@ -1377,6 +1383,8 @@ class Main(tk.Frame):
 
             elif cycle_instruction == 'ID':
 
+                id_branch = if_branch
+                id_instruction = if_instruction
                 six_to_zero = self.internal_registers_dict['IF/ID.IR']['value'][::-1][0:7][::-1]
                 nineteen_to_fifteen = self.internal_registers_dict['IF/ID.IR']['value'][::-1][15:20][::-1]
                 twenty_four_to_twenty = self.internal_registers_dict['IF/ID.IR']['value'][::-1][20:25][::-1]
@@ -1430,16 +1438,17 @@ class Main(tk.Frame):
                 register_b = int(register_b_in_binary, 2)
                 register_b = to_signed_integer(register_b, 32)
 
+
                 if six_to_zero == ALU_ALU_OPCODE:
-                    if instruction == 'add':
+                    if id_instruction == 'add':
                         # performs addition of rs1 and rs2. Arithmetic overflow is ignored,
                         # and the low 32 bits of the result is written in rd.
                         result = register_a + register_b
-                    elif instruction == 'slt':
+                    elif id_instruction == 'slt':
                         # SLT (set if less than) performs signed compare, places the value 1 in
                         # register rd if register rs1 < rs2, 0 otherwise.
                         result = 1 if register_a < register_b else 0
-                    elif instruction == 'sll':
+                    elif id_instruction == 'sll':
                         # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift
                         # amount held in the lower 5 bits of register rs2 and the result is placed in rd.
                         # Zeros are shifted into the lower bits.
@@ -1454,7 +1463,7 @@ class Main(tk.Frame):
                         # only get the last 32 bits
                         result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
 
-                    elif instruction == 'srl':
+                    elif id_instruction == 'srl':
                         # SLL (shift left logical)- the operand to be shifted is in rs1 by the shift amount
                         # held in the lower 5 bits of register rs2 and the result is placed in rd.
                         # Zeros are shifted into the lower bits.
@@ -1468,19 +1477,19 @@ class Main(tk.Frame):
                         # only get the last 32 bits
                         result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
 
-                    elif instruction == 'and':
+                    elif id_instruction == 'and':
                         # AND is a logical operation that performs bitwise AND on registers rs1 and rs2
                         # place the result in rd.
 
                         result = register_a & register_b
 
 
-                    elif instruction == 'or':
+                    elif id_instruction == 'or':
                         # OR is a logical operation that performs bitwise OR on registers
                         # rs1 and rs2 place the result in rd
                         result = register_a | register_b
 
-                    elif instruction == 'xor':
+                    elif id_instruction == 'xor':
                         # XOR is a logical operation that performs bitwise XOR on registers
                         # rs1 and rs2 place the result in rd.
                         result = register_a ^ register_b
@@ -1494,7 +1503,6 @@ class Main(tk.Frame):
 
                     # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
 
-
                 elif six_to_zero == ALU_IMM_OPCODE:
 
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
@@ -1505,16 +1513,16 @@ class Main(tk.Frame):
                     # print(f'Register A: {register_a}')
                     # print(f'Immediate: {imme}')
 
-                    if instruction == 'addi':
+                    if id_instruction == 'addi':
                         result = register_a + imme
 
-                    elif instruction == 'slti':
+                    elif id_instruction == 'slti':
                         # SLTI (set if less than) places the value 1 in register rd if register rs1 is less than
                         # the sign extended immediate when both are treated as signed
                         # integers; else 0 is written to rd.
                         result = 1 if register_a < imme else 0
 
-                    elif instruction == 'slli':
+                    elif id_instruction == 'slli':
                         # SLLI (shift left logical immediate) -
                         # the operand to be shifted is in rs1 and
                         # the shift amount is encoded in the lower 5
@@ -1530,7 +1538,7 @@ class Main(tk.Frame):
                         # only get the last 32 bits
                         result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
 
-                    elif instruction == 'srli':
+                    elif id_instruction == 'srli':
                         # SRLI (shift right logical immediate)- the operand to be shifted is in rs1 and the shift amount
                         # is encoded in the lower 5 bits of the immediate field and the result is placed in rd.
                         # Zeros are shifted into the upper bits.
@@ -1544,18 +1552,18 @@ class Main(tk.Frame):
                         # only get the last 32 bits
                         result = to_signed_integer(int(shifted_and_padded_substring[-32:], 2), 32)
 
-                    elif instruction == 'andi':
+                    elif id_instruction == 'andi':
                         # ANDI is a logical operation that
                         # performs bitwise AND on
                         # register rs1 and the sign- extended 12-bit immediate, place the result in rd.
                         result = register_a & imme
 
-                    elif instruction == 'ori':
+                    elif id_instruction == 'ori':
                         # ORI is a logical operation that performs bitwise OR on register rs1 and
                         # the sign- extended 12-bit immediate place the result in rd.
                         result = register_a | imme
 
-                    elif instruction == 'xori':
+                    elif id_instruction == 'xori':
                         # XORI is a logical operation that performs bitwise XOR on register rs1 and
                         # the sign- extended 12-bit immediate place the result in rd.
                         result = register_a ^ imme
@@ -1569,7 +1577,30 @@ class Main(tk.Frame):
                     # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
 
                 elif six_to_zero == BRANCH_OPCODE:
-                    pass
+
+                    cond = '0'
+
+                    if id_instruction == 'beq' and register_a == register_b:
+                        cond = '1'
+                        will_jump = True
+                    elif id_instruction == 'bne' and register_a != register_b:
+                        cond = '1'
+                        will_jump = True
+                    elif id_instruction == 'blt' and register_a < register_b:
+                        cond = '1'
+                        will_jump = True
+                    elif id_instruction == 'bge' and register_a >= register_b:
+                        cond = '1'
+                        will_jump = True
+
+                    # print(f'Instruction {id_instruction}')
+                    # print(f'Register A: {register_a}')
+                    # print(f'Register B: {register_b}')
+
+                    self.internal_registers_dict['EX/MEM.COND']['value'] = cond
+                    address_to_branch = self.jump_instructions[id_branch]
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(int(address_to_branch, 2), 32)
+
                 elif six_to_zero in [SW_OPCODE, LW_OPCODE]:
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
 
@@ -1578,10 +1609,9 @@ class Main(tk.Frame):
 
 
                     # Even though switched ung destination and source, ginaya ko nalang notion formula mo
-                    if instruction in ['sw', 'lw']:
+                    if id_instruction in ['sw', 'lw']:
                         self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + to_signed_integer(
                             int(immediate_in_binary, 2), 12), 32)
-
 
 
                 if check_a_cycle:
@@ -1591,6 +1621,16 @@ class Main(tk.Frame):
                     print('=' * 100)
 
             elif cycle_instruction == 'MEM':
+
+                # This will be used to change the pipeline map on runtime
+                if will_jump:
+                    will_jump = False
+                    if not check_a_cycle:
+                        print(f"Cycle: {cycle_instruction}")
+                        print(f"New PC for New Pipeline: {address_to_branch}")
+                        print('*' * 100)
+                        address_to_branch = ''
+                    break
 
                 six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]    
                 eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]
@@ -1889,8 +1929,10 @@ var: .word 333
 var2: .word 999
 .text
 sw x5, var2(x11)
-beq x10, x11, l1
+beq x0, x0, l1
 lw x6, var2(x11)
+addi x1, x2, 3
+addi x4, x5, 4
 l1:
 sw x10, (x0)
 .data

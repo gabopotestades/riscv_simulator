@@ -1630,7 +1630,14 @@ class Main(tk.Frame):
                         print(f"New PC for New Pipeline: {address_to_branch}")
                         print('*' * 100)
                         address_to_branch = ''
+                    # Generate new pipeline map
+                   #def append_new_pipeline_items:
+                   #    self.old_pipeline_map = self.pipeline_map_df
+                   #    generate_new_pipeline() <-- Use initial pipeline function which will change the existing pipeline map
+                   #    self.execute()
+                   #      
                     break
+                    
 
                 six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]    
                 eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]

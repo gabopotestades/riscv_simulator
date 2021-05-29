@@ -76,15 +76,15 @@ class Main(tk.Frame):
             "x0": {"is_editable": False, "value": '0'},
             "x1": {"is_editable": True, "value": '0'},
             "x2": {"is_editable": True, "value": '0'},
-            "x3": {"is_editable": True, "value": '00000000000000000000000000001010'},
-            "x4": {"is_editable": True, "value": '00000000000000000000000000001001'},
-            "x5": {"is_editable": True, "value": '10010001101001010101111001101'},
-            "x6": {"is_editable": True, "value": '00000000000000000000000000001000'},
+            "x3": {"is_editable": True, "value": '0'},
+            "x4": {"is_editable": True, "value": '0'},
+            "x5": {"is_editable": True, "value": '0'},
+            "x6": {"is_editable": True, "value": '0'},
             "x7": {"is_editable": True, "value": '0'},
             "x8": {"is_editable": True, "value": '0'},
             "x9": {"is_editable": True, "value": '0'},
             "x10": {"is_editable": True, "value": '0'},
-            "x11": {"is_editable": True, "value": '11100'},
+            "x11": {"is_editable": True, "value": '0'},
             "x12": {"is_editable": True, "value": '0'},
             "x13": {"is_editable": True, "value": '0'},
             "x14": {"is_editable": True, "value": '0'},
@@ -141,6 +141,9 @@ class Main(tk.Frame):
         self.evaluate()
         if self.parsing_passed:
             self.execute()
+            
+            # print(self.old_pipeline_map_df)
+            # self.print_registers()
 
 
     def repopulate_register_ui(self):
@@ -442,6 +445,11 @@ class Main(tk.Frame):
         self.repopulate_data_segment_ui()
         self.repopulate_pipeline_ui(self.pipeline_map_df)
 
+    
+    def print_registers(self):
+        for key, value in self.registers_dict.items():
+            var_value = value['value']
+            print(f'Register: {key} | Value - {var_value}')
 
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
@@ -995,6 +1003,7 @@ class Main(tk.Frame):
         additional_columns = 4
         previous_stalled = None
         initial_index = 0
+        cycle_counter = starting_cycle_number
         total_initial_cycles = 4 + (len(self.binary_table_df.index))
         self.pipeline_map_df = pd.DataFrame(columns=INITIAL_PIPELINE_COLUMNS)
 
@@ -1004,6 +1013,8 @@ class Main(tk.Frame):
             counter = starting_cycle_number
             initial_index = self.binary_table_df.index[self.binary_table_df['address'] == address_to_branch].tolist()[0]
             total_initial_cycles = starting_cycle_number + ((len(self.binary_table_df.index) - initial_index) + 4)
+            # print(f'Address To Branch: {address_to_branch}')
+            # print(f'Initial Index: {initial_index}')
             # print(f'Total Initial Cycles: {total_initial_cycles}')
 
         # Create columns for each clock cycle
@@ -1125,8 +1136,8 @@ class Main(tk.Frame):
                                     if step:
 
                                         if not is_initial: 
-                                            column_to_check = initial_index + 1
-                                            column_range_end = initial_index + column_range_end
+                                            column_to_check = starting_cycle_number 
+                                            column_range_end = starting_cycle_number + column_range_end - 1
 
                                         for col_num in range(column_to_check, column_range_end):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
@@ -1203,6 +1214,7 @@ class Main(tk.Frame):
 
             # Add row to the pipeline map
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
+            cycle_counter + 1
             counter += 1
 
         # print('*' * 100)
@@ -1210,7 +1222,9 @@ class Main(tk.Frame):
         if is_initial:
             self.repopulate_pipeline_ui(self.pipeline_map_df)
         else:
-            self.execute()
+            print(f'Cycle Counter: {cycle_counter}')
+            print('%' * 100)
+            self.execute(cycle_counter)
 
     # Gets the string from the edit text box
     def evaluate(self):
@@ -1349,7 +1363,9 @@ class Main(tk.Frame):
         self.repopulate_labels_ui()
         self.repopulate_text_segment_ui()
 
-    def execute(self):
+    def execute(self, cycle_number = 1):
+
+        # self.print_formatted_table()
 
         def represents_int(s):
             try:
@@ -1374,11 +1390,11 @@ class Main(tk.Frame):
             return signed
 
         # Add pipeline cycle instructions to list to be executed
-        cycle_number = 1
         self.current_pipeline_instructions = []
+        cycle_inside_pipeline_instructions = cycle_number
         for column in self.pipeline_map_df.columns[3:]:
-            self.current_pipeline_instructions.append(cycle_number)
-            cycle_number += 1
+            self.current_pipeline_instructions.append(cycle_inside_pipeline_instructions)
+            cycle_inside_pipeline_instructions += 1
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
     
@@ -1483,8 +1499,9 @@ class Main(tk.Frame):
                 self.internal_registers_dict['EX/MEM.IR']['value'] = self.internal_registers_dict['ID/EX.IR']['value']
                 self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
                 self.internal_registers_dict['EX/MEM.COND']['value'] = '0'
-                six_to_zero = self.internal_registers_dict['ID/EX.IR']['value'][::-1][0:7][::-1]
+                six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]
+                thirty_one_to_twenty_five = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][25:32][::-1]
                 result = 0
 
                 register_a_in_binary = self.internal_registers_dict['ID/EX.A']['value']
@@ -1496,7 +1513,6 @@ class Main(tk.Frame):
 
                 register_b = int(register_b_in_binary, 2)
                 register_b = to_signed_integer(register_b, 32)
-
 
                 if six_to_zero == ALU_ALU_OPCODE:
                     if id_instruction == 'add':
@@ -1661,17 +1677,17 @@ class Main(tk.Frame):
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(int(address_to_branch, 2), 32)
 
                 elif six_to_zero in [SW_OPCODE, LW_OPCODE]:
+
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
 
-                    # Store instruction copy the value in register rs2 to memory.
-                    # Effective address is obtained by adding register rs to the sign-extended 12-bit offset.
+                    # print('*' * 100)
+                    # print(f'Register A: {register_a}')
+                    # print(f'Register B: {register_b}')
+                    # print(f'Immediate: {immediate_in_binary}')
+                    immediate_in_binary = int(immediate_in_binary, 2)
+                    immediate_in_binary = to_signed_integer(immediate_in_binary, 12)
 
-
-                    # Even though switched ung destination and source, ginaya ko nalang notion formula mo
-                    if id_instruction in ['sw', 'lw']:
-                        self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + to_signed_integer(
-                            int(immediate_in_binary, 2), 12), 32)
-
+                    self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + immediate_in_binary, 32)
 
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
@@ -1691,9 +1707,17 @@ class Main(tk.Frame):
                     #     address_to_branch = ''
 
                     will_jump = False
+                    cycles_to_be_dropped = cycle_number + 1
+                    pipeline_columns_count = int(self.pipeline_map_df.columns[-1].replace('Cycle' , '')) + 1 # len(self.pipeline_map_df.columns) - 2
                     self.internal_registers_dict['PC']['value'] = address_to_branch
                     self.internal_registers_dict['IF/ID.NPC']['value'] =  address_to_branch
-                    dropped_columns = ['Cycle ' + str(n) for n in range(cycle_number + 1, len(self.pipeline_map_df.columns) - 2)]
+                    dropped_columns = ['Cycle ' + str(n) for n in range(cycles_to_be_dropped, pipeline_columns_count)]
+                    
+                    # print('$' * 100)
+                    # print(f'Cycle number: {cycles_to_be_dropped}, Pipeline Columns: {pipeline_columns_count}')
+                    # print(self.pipeline_map_df)
+                    # print(f'Columns to be dropped: {dropped_columns}')
+                    # print('^' * 100)
 
                     self.pipeline_map_df = self.pipeline_map_df.drop(dropped_columns, axis = 1)
                     self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
@@ -1705,9 +1729,9 @@ class Main(tk.Frame):
                     self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
                     self.repopulate_pipeline_ui(self.old_pipeline_map_df)
 
-                    print(self.old_pipeline_map_df)
+                    # print(self.old_pipeline_map_df)
    
-                    break
+                    return 
                     
 
                 six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]    
@@ -1812,6 +1836,8 @@ class Main(tk.Frame):
 
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
+        
+        # print(self.pipeline_map_df)
 
 
 if __name__ == "__main__":
@@ -2001,39 +2027,51 @@ if __name__ == "__main__":
 # add x3, x4, x5
 # """
 
-    sample_input =  """
-.data
-var: .word 333
-var2: .word 999
-.text
-sw x5, var2(x11)
-beq x0, x0, l1
-lw x6, var2(x11)
-addi x1, x2, 3
-addi x4, x5, 4
-addi x5, x4, 3
-l1:
-lw x20, var2(x11)
-add x1, x10, x4
-add x1, x1, x4
-add x1, x2, x4
-add x0, x3, x4
-sw x1, (x0)
-.data
-
-"""
-
 #     sample_input =  """
+# .data
+# var: .word 333
+# var2: .word 999
 # .text
-# lw x10, 3(x11)
+# sw x5, var2(x11)
+# beq x0, x6, l1
+# lw x6, var2(x11)
+# addi x1, x2, 3
+# addi x4, x5, 4
+# addi x5, x4, 3
+# l1:
+# lw x20, var2(x11)
 # add x1, x10, x4
-# add x1, x12, x4
-# add x1, x12, x4
-# add x1, x12, x4
-# add x1, x12, x4
-# sw x10, (x0)
+# add x1, x1, x4
+# add x1, x2, x4
+# add x0, x1, x0
+# sw x1, (x0)
+# .data
 
 # """
+
+    sample_input =  """
+.text
+
+addi x1, x0, 0x0ff
+addi x2, x0, 0
+addi x3, x0, 0
+addi x4, x0, 3
+
+jumper:
+sw x1, 0(x2)
+addi x2, x2, 4
+addi x3, x3, 1
+bne x3, x4, jumper
+
+and x3, x4, x5
+ori x4, x3, 5
+addi x9, x10, 26
+addi x9, x10, 26
+
+
+
+
+"""
     # endregion Declarables
 
     root = tk.Tk()

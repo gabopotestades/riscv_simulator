@@ -557,6 +557,10 @@ class Main(tk.Frame):
                     else:
                         thirtyone_to_twenty = bin(string_to_int & 0xfff)[2:]
 
+
+                if int(thirtyone_to_twenty, 2) > 4095: #If greater than 0xfff
+                    return 'Immediate value is greater than 0xfff.'
+
                 thirtyone_to_twenty = thirtyone_to_twenty[-12:len(thirtyone_to_twenty)]
 
                 # print(f"hex received: {thirtyone_to_twenty} in int: {int(thirtyone_to_twenty, 16)} in raw: {matched_string[3]}")
@@ -605,6 +609,10 @@ class Main(tk.Frame):
                         immediate = bin(0)[2:].zfill(12)
                 else:
                     immediate = bin(0)[2:].zfill(12)
+
+
+                if int(immediate, 2) > 4095: #If greater than 0xfff
+                    return 'Immediate value is greater than 0xfff.'
 
                 immi_0_4 = int(immediate[::-1][0:5][::-1], 2)
 
@@ -738,6 +746,8 @@ class Main(tk.Frame):
             else:
                 pending_variable_name_temp = None
 
+            if type(row_to_return) == str:
+                return row_to_return
             # Cast to binary
             row_to_return = {key: bin(int(value)) for key, value in row_to_return.items()
                              if key not in ['pending_jump', 'pending_variable']}
@@ -1268,8 +1278,11 @@ class Main(tk.Frame):
                 if match_regex:
                     if self.is_text:
                         row_to_add = self.parse_instruction(key, match_regex.groups(), formatted_command, True)
-                        self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
-                        if self.test: msg = match_regex.groups()
+                        if type(row_to_add) == str:
+                            msg = f"Line: {self.line_counter}, Error: {row_to_add}"
+                        else:
+                            self.binary_table_df = self.binary_table_df.append(row_to_add, ignore_index=True)
+                            if self.test: msg = match_regex.groups()
                     else:
                         msg = f"Line: {self.line_counter}, Error: No '.text' reserved word found before this instruction."
 
@@ -1872,7 +1885,7 @@ if __name__ == "__main__":
     # Old regex for load store
     # regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
 
-    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*((?!x(0|0?[1-9]|[12][0-9]|3[01]))[a-z_][\w]+|[-+]?0|[-+]?[1-9]+|0x[a-f0-9]+)?(\(x(0|0?[1-9]|[12][0-9]|3[01])\))?$"
+    regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*((?!x(0|0?[1-9]|[12][0-9]|3[01]))[a-z_][\w]+|[-+]?0|[-+]?[1-9][0-9]*|0x[a-f0-9]+)?(\(x(0|0?[1-9]|[12][0-9]|3[01])\))?$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
     regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9][0-9]*|0x[a-f0-9]+)$"
     regex_branching_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"
@@ -1993,6 +2006,12 @@ if __name__ == "__main__":
         }
     }
 
+#     sample_input =  """
+# .text
+# addi x3, x4, 0x33
+# lw x4, 4096(x4)
+# """
+
     sample_input =  """
 .data
 var1: .word 6
@@ -2033,7 +2052,7 @@ sw x2, 4(x13)
 # lw x6, 2(x18)
 # """
 
-# sample_input =  """
+#     sample_input =  """
 # .text
 # addi x5, x0, 8
 # beq x5, x3, l1

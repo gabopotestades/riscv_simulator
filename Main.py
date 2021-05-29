@@ -141,6 +141,7 @@ class Main(tk.Frame):
         self.evaluate()
         if self.parsing_passed:
             self.execute()
+            self.repopulate_pipeline_ui(self.old_pipeline_map_df)
             
             # print(self.old_pipeline_map_df)
             # self.print_registers()
@@ -1078,7 +1079,7 @@ class Main(tk.Frame):
                         if previous_stalled == 'ID':
 
                             new_cycle = 'Cycle ' + str(len(self.pipeline_map_df.columns) - 2)
-                            self.pipeline_map_df[new_cycle] = ''
+                            # self.pipeline_map_df[new_cycle] = ''
                             # row_to_add[new_cycle] = ''
 
                             column_in_current_cycle += 1
@@ -1173,8 +1174,8 @@ class Main(tk.Frame):
 
                                     if step:
                                         if not is_initial: 
-                                            column_to_check = initial_index + 1
-                                            column_range_end = initial_index + column_range_end
+                                            column_to_check = starting_cycle_number 
+                                            column_range_end = starting_cycle_number + column_range_end - 1
 
                                         for col_num in range(column_to_check, column_range_end):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
@@ -1222,8 +1223,8 @@ class Main(tk.Frame):
         if is_initial:
             self.repopulate_pipeline_ui(self.pipeline_map_df)
         else:
-            print(f'Cycle Counter: {cycle_counter}')
-            print('%' * 100)
+            # print(f'Cycle Counter: {cycle_counter}')
+            # print('%' * 100)
             self.execute(cycle_counter)
 
     # Gets the string from the edit text box
@@ -1398,6 +1399,10 @@ class Main(tk.Frame):
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
     
+
+        # print('Instructions List:')
+        # print(self.current_pipeline_instructions)
+
         address_to_branch = ''
         check_a_cycle = False
         will_jump = False
@@ -1721,13 +1726,15 @@ class Main(tk.Frame):
 
                     self.pipeline_map_df = self.pipeline_map_df.drop(dropped_columns, axis = 1)
                     self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
+                    self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
                     self.generate_pipeline_map(False, address_to_branch, int(dropped_columns[0].replace('Cycle ', '')) + 1)
                     
+                    # print(f'Register x3: {self.registers_dict["x3"]}')
 
-                    # Only temporary, for viewing
-                    self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
-                    self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
-                    self.repopulate_pipeline_ui(self.old_pipeline_map_df)
+                    # # Only temporary, for viewing
+                    # self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
+                    # self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
+                    # self.repopulate_pipeline_ui(self.old_pipeline_map_df)
 
                     # print(self.old_pipeline_map_df)
    
@@ -1836,6 +1843,13 @@ class Main(tk.Frame):
 
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
+                
+                # print(f'Cycle number: {cycle_number}, Max: {cycle_inside_pipeline_instructions}')
+
+                if cycle_number == cycle_inside_pipeline_instructions - 1:
+                    self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
+                    self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
+                    self.repopulate_pipeline_ui(self.old_pipeline_map_df)
         
         # print(self.pipeline_map_df)
 
@@ -1979,26 +1993,26 @@ if __name__ == "__main__":
         }
     }
 
-#     sample_input =  """
-# .data
-# var1: .word 6
-# x: .word 0x0ff
-# .text
-# addi x5, x0, 8
-# addi x6, x0, 4
-# BLT x5, x6, L1
-# xor x6, x5, x6
-# and x8, x6, x6
-# beq x0, x0, FIN
-# L1:
-# sll x7, x5, x6
-# srl x8, x5, x6
-# FIN:
-# addi x0, x0, 0
-# lw x1, 3(x15)
-# addi x2, x1, 33
-# sw x2, 4(x13)
-# """
+    sample_input =  """
+.data
+var1: .word 6
+x: .word 0x0ff
+.text
+addi x5, x0, 3
+addi x6, x0, 4
+BLT x5, x6, L1
+xor x6, x5, x6
+and x8, x6, x6
+beq x0, x0, FIN
+L1:
+sll x7, x5, x6
+srl x8, x5, x6
+FIN:
+addi x0, x0, 0
+lw x1, 3(x15)
+addi x2, x1, 33
+sw x2, 4(x13)
+"""
 
 #     sample_input =  """
 # .data
@@ -2039,7 +2053,7 @@ if __name__ == "__main__":
 # addi x4, x5, 4
 # addi x5, x4, 3
 # l1:
-# lw x20, var2(x11)
+# lw x10, var2(x11)
 # add x1, x10, x4
 # add x1, x1, x4
 # add x1, x2, x4
@@ -2049,29 +2063,26 @@ if __name__ == "__main__":
 
 # """
 
-    sample_input =  """
-.text
+#     sample_input =  """
+# .text
 
-addi x1, x0, 0x0ff
-addi x2, x0, 0
-addi x3, x0, 0
-addi x4, x0, 3
+# addi x1, x0, 0x0ff
+# addi x2, x0, 0
+# addi x3, x0, 0
+# addi x4, x0, 4
 
-jumper:
-sw x1, 0(x2)
-addi x2, x2, 4
-addi x3, x3, 1
-bne x3, x4, jumper
+# jumper:
+# sw x1, 0(x2)
+# addi x2, x2, 4
+# addi x3, x3, 1
+# bne x3, x4, jumper
 
-and x3, x4, x5
-ori x4, x3, 5
-addi x9, x10, 26
-addi x9, x10, 26
+# and x3, x4, x5
+# ori x4, x3, 5
+# addi x9, x10, 26
+# addi x9, x10, 26
 
-
-
-
-"""
+# """
     # endregion Declarables
 
     root = tk.Tk()

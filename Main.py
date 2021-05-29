@@ -4,12 +4,17 @@ import sys
 import csv
 import tkinter as tk
 from tkinter import Label, Button, Text, CENTER, INSERT, END
+from pandas.tseries.frequencies import to_offset
 from tksheet import Sheet
+import numpy as np
 import pandas as pd
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 # pd.set_option('display.max_colwidth', -1)
+
+# Constants
+INITIAL_PIPELINE_COLUMNS = ['address', 'instruction', 'opcode']
 
 #  Opcode Types
 LW_OPCODE = '0000011'
@@ -109,6 +114,7 @@ class Main(tk.Frame):
 
 
         self.pipeline_map_df = pd.DataFrame()
+        self.old_pipeline_map_df = pd.DataFrame()
         self.current_pipeline_instructions = []
 
         self.commands_dict = commands_dict
@@ -243,22 +249,22 @@ class Main(tk.Frame):
                                                verify=False,
                                                reset_highlights=False)
 
-    def repopulate_pipeline_ui(self):
+    def repopulate_pipeline_ui(self, pipeline_map):
         list_version_of_pipeline_df= []
         # for label, value in self.labels_dict.items():
         #     list_version_of_pipeline_df += [[label, value]]
 
         list_version_of_pipeline_df = []
 
-        for x in range(self.pipeline_map_df.shape[0]):
-            temp_flattened_list = self.pipeline_map_df.loc[x, self.pipeline_map_df.columns != 'opcode'].values.tolist()
+        for x in range(pipeline_map.shape[0]):
+            temp_flattened_list = pipeline_map.loc[x, pipeline_map.columns != 'opcode'].values.tolist()
             temp_flattened_list[0] = "0x" + "{0:0>4X}".format(int(temp_flattened_list[0], 2))
 
             list_version_of_pipeline_df += [temp_flattened_list]
 
 
 
-        list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, self.pipeline_map_df.shape[1] - 2)]
+        list_of_clock_cycles = ['ADDRESS', 'INSTRUCTION'] + [f'CYCLE {x}' for x in range(1, pipeline_map.shape[1] - 2)]
 
         self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
                                      reset_col_positions=False, show_headers_if_not_sheet=True)
@@ -434,7 +440,7 @@ class Main(tk.Frame):
         self.repopulate_register_ui()
         self.repopulate_internal_register_ui()
         self.repopulate_data_segment_ui()
-        self.repopulate_pipeline_ui()
+        self.repopulate_pipeline_ui(self.pipeline_map_df)
 
 
     def print_jump_intructions(self):
@@ -982,25 +988,33 @@ class Main(tk.Frame):
                     print("#" * 100)
 
     # After parsing, generate a rough draft of the pipeline map
-    def generate_initial_pipeline_map(self):
+    def generate_pipeline_map(self, is_initial, address_to_branch, starting_cycle_number):
 
         # Reset pipeline map
         counter = 1
         additional_columns = 4
         previous_stalled = None
+        initial_index = 0
         total_initial_cycles = 4 + (len(self.binary_table_df.index))
-        self.pipeline_map_df = pd.DataFrame(columns=['address', 'instruction', 'opcode'])
+        self.pipeline_map_df = pd.DataFrame(columns=INITIAL_PIPELINE_COLUMNS)
 
+        if is_initial: 
+            self.old_pipeline_map_df = pd.DataFrame(columns=INITIAL_PIPELINE_COLUMNS)
+        else:
+            counter = starting_cycle_number
+            initial_index = self.binary_table_df.index[self.binary_table_df['address'] == address_to_branch].tolist()[0]
+            total_initial_cycles = starting_cycle_number + ((len(self.binary_table_df.index) - initial_index) + 4)
+            # print(f'Total Initial Cycles: {total_initial_cycles}')
 
         # Create columns for each clock cycle
-        for cycle_number in range(1, total_initial_cycles):
+        for cycle_number in range(starting_cycle_number, total_initial_cycles):
             cycle_name = 'Cycle ' + str(cycle_number)
             self.pipeline_map_df[cycle_name] = ''
 
         # Iterate over each row in the opcode table
         # to be added to the pipeline map
         # for index, row in self.binary_table_df.iterrows():
-        for opcode_index in range(self.binary_table_df.shape[0]):
+        for opcode_index in range(initial_index, self.binary_table_df.shape[0]):
 
             # Initialize row
             is_started = False
@@ -1014,17 +1028,24 @@ class Main(tk.Frame):
             num_rows_lookback = opcode_index - 5 if opcode_index > 4 else 0
             current_opcode = current_row['6-0'][2:].zfill(7)[::-1][0:7][::-1]
             row_to_add = {'address': current_row['address'], 'instruction': current_row['actual_command'], 'opcode': current_opcode}
+            row_to_add_for_old_pipeline = row_to_add.copy()
 
 
             # If first row, don't get the previous
-            if opcode_index != 0:
+            if opcode_index != initial_index:
                 previous_rows = self.binary_table_df.iloc[num_rows_lookback: opcode_index, :]
                 previous_rows_with_dependencies = previous_rows[(previous_rows['rd'] != '') &
                                                                 ((previous_rows['rd'] == current_rs1) |
                                                                 (previous_rows['rd'] == current_rs2)) ]
 
-            cycle_number = 1
-            column_in_current_cycle = additional_columns + (len(self.binary_table_df.index))
+            if is_initial or initial_index == 0:
+                cycle_number = 1
+                column_in_current_cycle = additional_columns + (len(self.binary_table_df.index))
+            else:
+                cycle_number = starting_cycle_number 
+                column_in_current_cycle = additional_columns + (len(self.binary_table_df.index) - initial_index )
+                # print(f'Column in Current Cycle: {column_in_current_cycle}')
+                
             # Add columns per cycle to the row
             while column_in_current_cycle > 0:
 
@@ -1045,12 +1066,12 @@ class Main(tk.Frame):
 
                         if previous_stalled == 'ID':
 
-                            new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                            new_cycle = 'Cycle ' + str(len(self.pipeline_map_df.columns) - 2)
                             self.pipeline_map_df[new_cycle] = ''
-                            row_to_add[new_cycle] = ''
+                            # row_to_add[new_cycle] = ''
+
                             column_in_current_cycle += 1
                             additional_columns += 1
-
                             previous_stalled = None
                             internal_counter -= 1
                             counter += 1
@@ -1071,7 +1092,7 @@ class Main(tk.Frame):
                         if previous_stalled == 'MEM':
                             previous_stalled = 'EX'
 
-                        if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
+                        if opcode_index != initial_index and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
 
@@ -1086,6 +1107,8 @@ class Main(tk.Frame):
                                     current_columns_of_row_with_dependency = current_row_with_dependency.columns
 
                                     step = None
+                                    column_to_check = 1
+                                    column_range_end = len(current_columns_of_row_with_dependency) - 2
                                     if current_row_with_dependency_opcode == LW_OPCODE and current_opcode != LW_OPCODE:
 
                                         if (current_opcode == SW_OPCODE and current_row_with_dependency_rd == current_rs1) or \
@@ -1100,7 +1123,12 @@ class Main(tk.Frame):
                                         step = 'EX'
 
                                     if step:
-                                        for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
+
+                                        if not is_initial: 
+                                            column_to_check = initial_index + 1
+                                            column_range_end = initial_index + column_range_end
+
+                                        for col_num in range(column_to_check, column_range_end):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
                                                 if cycle_number <= col_num:
                                                     stall_count = (col_num - cycle_number) + 1
@@ -1111,7 +1139,8 @@ class Main(tk.Frame):
                     elif internal_counter == 4:
                         cell = 'MEM'
 
-                        if opcode_index != 0 and previous_rows_with_dependencies.shape[0] > 0:
+
+                        if opcode_index != initial_index and previous_rows_with_dependencies.shape[0] > 0:
 
                             for index, row in previous_rows_with_dependencies.iterrows():
 
@@ -1126,11 +1155,17 @@ class Main(tk.Frame):
                                     current_columns_of_row_with_dependency = current_row_with_dependency.columns
 
                                     step = None
+                                    column_to_check = 1
+                                    column_range_end = len(current_columns_of_row_with_dependency) - 2
                                     if current_row_with_dependency_opcode == LW_OPCODE and current_rs1 == current_row_with_dependency_rd:
                                         step = 'MEM'
 
                                     if step:
-                                        for col_num in range(1, len(current_columns_of_row_with_dependency) - 2):
+                                        if not is_initial: 
+                                            column_to_check = initial_index + 1
+                                            column_range_end = initial_index + column_range_end
+
+                                        for col_num in range(column_to_check, column_range_end):
                                             if current_row_with_dependency['Cycle ' + str(col_num)][0] == step:
                                                 if cycle_number <= col_num:
                                                     stall_count = (col_num - cycle_number) + 1
@@ -1139,16 +1174,16 @@ class Main(tk.Frame):
                                                     cell = '*'
 
                         # Add extra column if the second to the last column is reached
-                        if opcode_index == len(self.binary_table_df) - 1 and previous_stalled:
-                            new_cycle = 'Cycle ' + str(self.pipeline_map_df.shape[1] - 2)
+                        if opcode_index == len(self.binary_table_df.index) - 1 and previous_stalled:
+                            new_cycle = 'Cycle ' + str(cycle_number + 1)
                             self.pipeline_map_df[new_cycle] = ''
                             row_to_add[new_cycle] = ''
                             column_in_current_cycle += 1
                             additional_columns += 1
 
                     elif internal_counter == 5:
+                        
                         # print(f'{opcode_index}: Cycle Num: {cycle_number}, Stall: {stall_count}, Counter: {counter}')
-
                         cell = 'WB'
 
                     # if stall_count == 0:
@@ -1159,15 +1194,23 @@ class Main(tk.Frame):
 
                 # Add cycle to the row dictionary
                 row_to_add[cycle_name] = cell
+
                 cycle_number += 1
                 column_in_current_cycle -= 1
+
+            if is_initial:
+                self.old_pipeline_map_df = self.old_pipeline_map_df.append(row_to_add_for_old_pipeline, ignore_index=True)
 
             # Add row to the pipeline map
             self.pipeline_map_df = self.pipeline_map_df.append(row_to_add, ignore_index=True)
             counter += 1
 
+        # print('*' * 100)
         # print(self.pipeline_map_df)
-        self.repopulate_pipeline_ui()
+        if is_initial:
+            self.repopulate_pipeline_ui(self.pipeline_map_df)
+        else:
+            self.execute()
 
     # Gets the string from the edit text box
     def evaluate(self):
@@ -1185,7 +1228,8 @@ class Main(tk.Frame):
 
         self.variables = {}
         self.jump_instructions = {}
-        self.current_pipeline_instructions = []
+        self.pipeline_map_df = pd.DataFrame()
+        self.old_pipeline_map_df = pd.DataFrame()
         self.current_data_segment = '0b000000000000' # 0x0000 in binary
         self.current_text_segment = '0b1000000000000' # 0x1000 in binary
         self.internal_registers_dict['PC']['value'] = self.current_text_segment
@@ -1300,12 +1344,19 @@ class Main(tk.Frame):
             # self.print_formatted_table()
             # print('=' * 100)
 
-            self.generate_initial_pipeline_map()
+            self.generate_pipeline_map(True, None, 1)
 
         self.repopulate_labels_ui()
         self.repopulate_text_segment_ui()
 
     def execute(self):
+
+        def represents_int(s):
+            try:
+                int(s)
+                return True
+            except ValueError:
+                return False
 
         def twos_comp(n, bits):
             s = bin(n & int("1"*bits, 2))[2:]
@@ -1323,10 +1374,14 @@ class Main(tk.Frame):
             return signed
 
         # Add pipeline cycle instructions to list to be executed
+        cycle_number = 1
+        self.current_pipeline_instructions = []
         for column in self.pipeline_map_df.columns[3:]:
+            self.current_pipeline_instructions.append(cycle_number)
+            cycle_number += 1
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
-
+    
         address_to_branch = ''
         check_a_cycle = False
         will_jump = False
@@ -1334,6 +1389,7 @@ class Main(tk.Frame):
         id_instruction = None
         if_branch = None
         id_branch = None
+
 
         if check_a_cycle:
             self.print_formatted_table()
@@ -1346,6 +1402,9 @@ class Main(tk.Frame):
         for cycle_instruction in self.current_pipeline_instructions:
 
             if cycle_instruction == '*':
+                continue
+            elif represents_int(cycle_instruction):
+                cycle_number = cycle_instruction
                 continue
 
             if cycle_instruction == 'IF':
@@ -1375,7 +1434,7 @@ class Main(tk.Frame):
                 #     self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
                 #     self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
 
-                if not check_a_cycle:
+                if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
                     print(f"PC: {self.internal_registers_dict['PC']['value']}")
@@ -1622,20 +1681,32 @@ class Main(tk.Frame):
 
             elif cycle_instruction == 'MEM':
 
-                # This will be used to change the pipeline map on runtime
+                # Drop the data in succeeding columns then branch
                 if will_jump:
+                    
+                    # if not check_a_cycle:
+                    #     print(f"Cycle: {cycle_instruction}")
+                    #     print(f"New PC for New Pipeline: {address_to_branch}")
+                    #     print('*' * 100)
+                    #     address_to_branch = ''
+
                     will_jump = False
-                    if not check_a_cycle:
-                        print(f"Cycle: {cycle_instruction}")
-                        print(f"New PC for New Pipeline: {address_to_branch}")
-                        print('*' * 100)
-                        address_to_branch = ''
-                    # Generate new pipeline map
-                   #def append_new_pipeline_items:
-                   #    self.old_pipeline_map = self.pipeline_map_df
-                   #    generate_new_pipeline() <-- Use initial pipeline function which will change the existing pipeline map
-                   #    self.execute()
-                   #      
+                    self.internal_registers_dict['PC']['value'] = address_to_branch
+                    self.internal_registers_dict['IF/ID.NPC']['value'] =  address_to_branch
+                    dropped_columns = ['Cycle ' + str(n) for n in range(cycle_number + 1, len(self.pipeline_map_df.columns) - 2)]
+
+                    self.pipeline_map_df = self.pipeline_map_df.drop(dropped_columns, axis = 1)
+                    self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
+                    self.generate_pipeline_map(False, address_to_branch, int(dropped_columns[0].replace('Cycle ', '')) + 1)
+                    
+
+                    # Only temporary, for viewing
+                    self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
+                    self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
+                    self.repopulate_pipeline_ui(self.old_pipeline_map_df)
+
+                    print(self.old_pipeline_map_df)
+   
                     break
                     
 
@@ -1655,7 +1726,7 @@ class Main(tk.Frame):
                     affected_memory = int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2)
 
                     if affected_memory > int(DATA_SEGMENT_LIMIT, 2):
-                        error_message = 'Runtime Error: Address is greater than the data segment limit.'
+                        error_message = f'Runtime Error, Line {(cycle_number - 4)}: Address is greater than the data segment limit.'
                         self.print_in_terminal(error_message)
                         self.runtime_passed = False
                         break 
@@ -1740,8 +1811,8 @@ class Main(tk.Frame):
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
 
                 self.repopulate_data_segment_ui()
-                # print(self.registers_dict)
                 self.repopulate_register_ui()
+
 
 if __name__ == "__main__":
 
@@ -1940,11 +2011,29 @@ beq x0, x0, l1
 lw x6, var2(x11)
 addi x1, x2, 3
 addi x4, x5, 4
+addi x5, x4, 3
 l1:
-sw x10, (x0)
+lw x20, var2(x11)
+add x1, x10, x4
+add x1, x1, x4
+add x1, x2, x4
+add x0, x3, x4
+sw x1, (x0)
 .data
 
 """
+
+#     sample_input =  """
+# .text
+# lw x10, 3(x11)
+# add x1, x10, x4
+# add x1, x12, x4
+# add x1, x12, x4
+# add x1, x12, x4
+# add x1, x12, x4
+# sw x10, (x0)
+
+# """
     # endregion Declarables
 
     root = tk.Tk()

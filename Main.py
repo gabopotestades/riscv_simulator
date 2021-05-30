@@ -47,29 +47,48 @@
                 self.terminal_text = None
 
                 self.internal_registers_dict = {
-                    "IF/ID.IR": {"value": '0'},
-                    "IF/ID.NPC": {"value": '0'},
-                    "PC": {"value": '0'},
+                    "IF/ID.IR": {"value": '0',
+                                 'hex_length': 8},
+                    "IF/ID.NPC": {"value": '0',
+                                 'hex_length': 4},
+                    "PC": {"value": '0',
+                                 'hex_length': 4},
 
-                    "ID/EX.A": {"value": '0'},
-                    "ID/EX.B": {"value": '0'},
-                    "ID/EX.IMM": {"value": '0'},
-                    "ID/EX.IR": {"value": '0'},
-                    "ID/EX.NPC": {"value": '0'},
+                    "ID/EX.A": {"value": '0',
+                                 'hex_length': 8},
+                    "ID/EX.B": {"value": '0',
+                                 'hex_length': 8},
+                    "ID/EX.IMM": {"value": '0',
+                                 'hex_length': 3},
+                    "ID/EX.IR": {"value": '0',
+                                 'hex_length': 8},
+                    "ID/EX.NPC": {"value": '0',
+                                 'hex_length': 4},
 
-                    "EX/MEM.ALUOUTPUT": {"value": '0'},
-                    "EX/MEM.COND": {"value": '0'},
-                    "EX/MEM.IR": {"value": '0'},
-                    "EX/MEM.B": {"value": '0'},
+                    "EX/MEM.ALUOUTPUT": {"value": '0',
+                                 'hex_length': 8},
+                    "EX/MEM.COND": {"value": '0',
+                                 'hex_length': 1},
+                    "EX/MEM.IR": {"value": '0',
+                                 'hex_length': 8},
+                    "EX/MEM.B": {"value": '0',
+                                 'hex_length': 8},
 
-                    "MEM/WB.LMD": {"value": '0'},
-                    "MEM/WB.IR": {"value": '0'},
-                    "MEM/WB.ALUOUTPUT": {"value": '0'},
-                    "MEM/MEMORY AFFECTED": {"value": '0'},
-                    "MEM/MEMORY VALUE": {"value": '0'},
+                    "MEM/WB.LMD": {"value": '0',
+                                 'hex_length': 8},
+                    "MEM/WB.IR": {"value": '0',
+                                 'hex_length': 8},
+                    "MEM/WB.ALUOUTPUT": {"value": '0',
+                                 'hex_length': 8},
+                    "MEM/MEMORY AFFECTED": {"value": '0',
+                                 'hex_length': 4},
+                    "MEM/MEMORY VALUE": {"value": '0',
+                                 'hex_length': 8},
 
-                    "WB/REGISTER AFFECTED": {"value": '0'},
-                    "WB/REGISTER VALUE": {"value": '0'}
+                    "WB/REGISTER AFFECTED": {"value": '0',
+                                 'hex_length': 2},
+                    "WB/REGISTER VALUE": {"value": '0',
+                                 'hex_length': 8}
                 }
 
                 self.registers_dict = {
@@ -156,8 +175,10 @@
                 # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
 
                 list_version_of_register_dict = []
+                index_registers = []
                 for register, value in self.registers_dict.items():
-                    list_version_of_register_dict += [[register, value['value']]]
+                    list_version_of_register_dict += [["{0:0>8X}".format(int(value['value'], 2))]]
+                    index_registers += [register]
 
                 self.registers_table.set_sheet_data(data=list_version_of_register_dict,
                                reset_col_positions=True,
@@ -166,10 +187,27 @@
                                verify=False,
                                reset_highlights=False)
 
+
+                self.registers_table.row_index(newindex=index_registers, reset_row_positions=False,
+                                              show_index_if_not_sheet=True)
+
+
             def repopulate_internal_register_ui(self):
                 list_version_of_internal_registers_dict = []
+                index_headers = []
                 for internal_register, value in self.internal_registers_dict.items():
-                    list_version_of_internal_registers_dict += [[internal_register, value['value']]]
+                    hex_length = value['hex_length']
+                    format_thingy = "0:0>{}X".format(hex_length)
+                    format_thingy = "{" + format_thingy + "}"
+                    in_hex = format_thingy.format(int(value['value'], 2))
+
+                    # Uncomment  to convert to proper hex value (and length)
+                    # list_version_of_internal_registers_dict += [[in_hex]]
+
+
+                    list_version_of_internal_registers_dict += [[value['value']]]
+
+                    index_headers += [internal_register]
 
                 self.internal_registers_table.set_sheet_data(data=list_version_of_internal_registers_dict,
                                                     reset_col_positions=True,
@@ -177,6 +215,9 @@
                                                     redraw=True,
                                                     verify=False,
                                                     reset_highlights=False)
+
+                self.internal_registers_table.row_index(newindex=index_headers, reset_row_positions=False,
+                                              show_index_if_not_sheet=True)
 
             def repopulate_data_segment_ui(self):
                 list_version_of_data_segment_dict = []
@@ -188,6 +229,7 @@
                 third = None
                 fourth = None
 
+                ui_address_list = []
                 for address, value in self.data_segment_dict.items():
                     counter += 1
 
@@ -207,7 +249,8 @@
                         third = "{0:0>2X}".format(int(third, 16))
                         fourth = "{0:0>2X}".format(int(fourth, 16))
 
-                        list_version_of_data_segment_dict += [[ui_address, f"{fourth} | {third} | {second} | {first}"]]
+                        list_version_of_data_segment_dict += [[f"{fourth} | {third} | {second} | {first}"]]
+                        ui_address_list += [ui_address]
 
                 self.data_segment_table.set_sheet_data(data=list_version_of_data_segment_dict,
                                                              reset_col_positions=True,
@@ -216,11 +259,15 @@
                                                              verify=False,
                                                              reset_highlights=False)
 
+                self.data_segment_table.row_index(newindex=ui_address_list, reset_row_positions=False,
+                                                        show_index_if_not_sheet=True)
+
+
             def repopulate_text_segment_ui(self):
 
                 list_version_of_text_segment_dict = []
 
-
+                index_addresses = []
                 for index, row in self.binary_table_df.iterrows():
                     thirty_one_to_twenty_five = row['31-25'][2:].zfill(7)[::-1][0:8][::-1]
                     twenty_four_to_twenty = row['24-20'][2:].zfill(5)[::-1][0:8][::-1]
@@ -231,7 +278,8 @@
 
                     concatenated = thirty_one_to_twenty_five + twenty_four_to_twenty + nineteen_to_fifteen + fourteen_to_twelve + eleven_to_seven + six_to_zero
 
-                    list_version_of_text_segment_dict += [["0x" + "{0:0>4X}".format(int(row['address'], 2)), "0x" + "{0:0>8X}".format(int(concatenated, 2)), row['actual_command']]]
+                    list_version_of_text_segment_dict += [["0x" + "{0:0>8X}".format(int(concatenated, 2)), row['actual_command']]]
+                    index_addresses += ["0x" + "{0:0>4X}".format(int(row['address'], 2))]
 
                 self.text_segment_table.set_sheet_data(data=list_version_of_text_segment_dict,
                                                        reset_col_positions=True,
@@ -240,16 +288,23 @@
                                                        verify=False,
                                                        reset_highlights=False)
 
+                self.text_segment_table.row_index(newindex=index_addresses, reset_row_positions=False,
+                                              show_index_if_not_sheet=True)
+
+
             def repopulate_labels_ui(self):
 
                 list_version_of_labels_dict = []
+                index_labels = []
                 for label, value in self.jump_instructions.items():
-                    list_version_of_labels_dict += [[label, "0x" + "{0:0>4X}".format(int(value, 2))]]
+                    list_version_of_labels_dict += [["0x" + "{0:0>4X}".format(int(value, 2))]]
+                    index_labels += [label]
 
                 for name, value in self.variables.items():
                     address = value['address']
 
                     list_version_of_labels_dict += [[name, "0x" + "{0:0>4X}".format(int(address, 2))]]
+                    index_labels += [name]
 
                 self.labels_table.set_sheet_data(data=list_version_of_labels_dict,
                                                        reset_col_positions=True,
@@ -257,6 +312,10 @@
                                                        redraw=True,
                                                        verify=False,
                                                        reset_highlights=False)
+
+                self.labels_table.row_index(newindex=index_labels, reset_row_positions=False,
+                                              show_index_if_not_sheet=True)
+
 
             def repopulate_pipeline_ui(self, pipeline_map):
                 list_version_of_pipeline_df= []
@@ -284,12 +343,14 @@
                                                        verify=False,
                                                        reset_highlights=False)
                 if pipeline_map.shape[0] > 0:
-                    print(pipeline_map['instruction'].tolist())
                     self.pipeline_map_table.row_index(newindex=pipeline_map['instruction'].tolist(),  reset_row_positions=False, show_index_if_not_sheet=True)
 
                 with open('pipelinemap.csv', 'w', newline='') as csvfile:
                     writer = csv.writer(csvfile)
-                    writer.writerows(list_version_of_pipeline_df)
+
+                    # writer.writerows(list_version_of_pipeline_df)
+                    writer.writerows(self.pipeline_map_table.get_sheet_data(get_index = True))
+
 
 
             def initialize_data_segment(self):
@@ -336,6 +397,8 @@
                 # Put column highlight
                 self.pipeline_map_table.highlight_columns(columns=[cycle_number], bg='gray', highlight_header=True, redraw=True)
 
+                # move view
+                self.pipeline_map_table.see(row=row_being_executed, column=cycle_number,check_cell_visibility=True)
 
                 print(f"waiting...{cycle_number}")
                 if self.is_line_by_line == True:
@@ -387,15 +450,15 @@
                 register_label.grid(row=1, column=second_col, columnspan=1, sticky='nswe')
 
                 self.registers_table = Sheet(self.master,
-                                             show_row_index=False,
+                                             show_row_index=True,
+                                                 row_index_width=20,
                                              header_height="0",
-                                             row_index_width=0,
                                              show_y_scrollbar=False,
                                              show_x_scrollbar=False,
                                              data=[[f"x{r}" if c == 0 else "0" for c in range(2)] for r in range(32)],
                                              theme = "dark blue")
 
-                self.registers_table.headers(newheaders=['REGISTER', 'VALUE'], index=None,
+                self.registers_table.headers(newheaders=['VALUE'], index=None,
                                              reset_col_positions=False, show_headers_if_not_sheet=True)
 
 
@@ -419,14 +482,14 @@
                 labels_label.grid(row=1, column=third_col, columnspan=1, sticky='nswe')
 
                 self.labels_table = Sheet(self.master,
-                                                show_row_index=False,
+                                                show_row_index=True,
                                                 header_height="0",
-                                                row_index_width=0,
                                                 show_y_scrollbar=False,
+                                                row_index_width=50,
                                                 show_x_scrollbar=False,
                                                 data=[],
                                                 theme = "dark blue")
-                self.labels_table.headers(newheaders=['LABEL', 'VALUE'], index=None,
+                self.labels_table.headers(newheaders=['VALUE'], index=None,
                                                       reset_col_positions=False, show_headers_if_not_sheet=True)
                 self.labels_table.enable_bindings()
 
@@ -436,13 +499,13 @@
                 data_segment_label.config(anchor=CENTER)
                 data_segment_label.grid(row=1, column=fifth_col, columnspan=1, sticky='nswe')
                 self.data_segment_table = Sheet(self.master,
-                                                show_row_index=False,
-                                                row_index_width=0,
+                                                show_row_index=True,
+                                                row_index_width=100,
                                                 show_y_scrollbar=False,
                                                 show_x_scrollbar=False,
                                                 data=[[]], theme = "dark blue")
                 self.data_segment_table.enable_bindings()
-                self.data_segment_table.headers(newheaders=['ADDRESS', 'VALUE'], index=None,
+                self.data_segment_table.headers(newheaders=['VALUE'], index=None,
                                                       reset_col_positions=False, show_headers_if_not_sheet=True)
                 self.data_segment_table.grid(row=2, column=fifth_col, columnspan=1, sticky="nswe")
 
@@ -451,13 +514,13 @@
                 text_segment_label.config(anchor=CENTER)
                 text_segment_label.grid(row=1, column=fourth_col, columnspan=1, sticky='nswe')
                 self.text_segment_table = Sheet(self.master,
-                                          show_row_index=False,
+                                          show_row_index=True,
                                           header_height="0",
-                                          row_index_width=0,
+                                          row_index_width=50,
                                           show_y_scrollbar=False,
                                           show_x_scrollbar=False,
                                           data=[[]], theme = "dark blue")
-                self.text_segment_table.headers(newheaders=['ADDRESS', 'CODE', 'BASIC'], index=None,
+                self.text_segment_table.headers(newheaders=['CODE', 'BASIC'], index=None,
                                                       reset_col_positions=False, show_headers_if_not_sheet=True)
                 self.text_segment_table.enable_bindings()
                 self.text_segment_table.grid(row=2, column=fourth_col, columnspan=1, sticky="nswe")
@@ -465,26 +528,27 @@
 
                 internal_registers_label = Label(self.master, text="INTERNAL REGISTERS", background="darkorange", foreground="white")
                 internal_registers_label.config(anchor=CENTER)
-                internal_registers_label.grid(row=5, column=second_col, columnspan=1,sticky='nswe')
+                internal_registers_label.grid(row=5, column=second_col, columnspan=2,sticky='nswe')
                 self.internal_registers_table = Sheet(self.master,
-                                                show_row_index=False,
+                                                show_row_index=True,
                                                 header_height="1",
-                                                row_index_width=0,
+                                                row_index_width=100,
+                                                column_width=200,
                                                 show_y_scrollbar=False,
                                                 show_x_scrollbar=False,
                                                 data=[[]])
-                self.internal_registers_table.headers(newheaders=['LABEL', 'CYCLE 1'], index=None,
+                self.internal_registers_table.headers(newheaders=['VALUE'], index=None,
                                                       reset_col_positions=False, show_headers_if_not_sheet=True)
                 self.internal_registers_table.change_theme(theme = "dark blue")
 
                 self.internal_registers_table.enable_bindings()
-                self.internal_registers_table.grid(row=6, column=second_col, columnspan=1, sticky="nswe")
+                self.internal_registers_table.grid(row=6, column=second_col, columnspan=2, sticky="nswe")
 
 
 
                 pipeline_map_label = Label(self.master, text="PIPELINE MAP",  background="darkgreen", foreground="white")
                 pipeline_map_label.config(anchor=CENTER)
-                pipeline_map_label.grid(row=5,  column=third_col, columnspan=3, sticky='nswe')
+                pipeline_map_label.grid(row=5,  column=fourth_col, columnspan=3, sticky='nswe')
                 self.pipeline_map_table = Sheet(self.master,
                                              show_row_index=True,
                                              header_height="0",
@@ -494,7 +558,7 @@
                                              data=[])
                 self.pipeline_map_table.enable_bindings()
                 self.pipeline_map_table.change_theme(theme = "dark blue")
-                self.pipeline_map_table.grid(row=6,  column=third_col, columnspan=3, sticky="nswe")
+                self.pipeline_map_table.grid(row=6,  column=fourth_col, columnspan=3, sticky="nswe")
 
 
 
@@ -1522,6 +1586,7 @@
 
                 # Iterate through each cycle instruction in the pipeline map
                 for cycle_instruction in self.current_pipeline_instructions:
+                    self.repopulate_internal_register_ui()
 
 
                     if cycle_instruction == '*':
@@ -2186,8 +2251,21 @@
 
             sample_input =  """
         .text
-        
-        addi x1, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+        addi x9, x0, 0x0ff
+
         addi x2, x0, 0
         addi x3, x0, 0
         addi x4, x0, 3

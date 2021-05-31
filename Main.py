@@ -117,7 +117,121 @@ class Main(tk.Frame):
         #     self.repopulate_pipeline_ui(self.old_pipeline_map_df)
             # print(self.old_pipeline_map_df)
             # self.print_registers()
-    
+
+    def reset_data(self):
+
+        self.is_data = False
+        self.is_text = False
+        self.parsing_passed = True
+        self.runtime_passed = True
+        self.line_counter = 1
+
+        self.internal_registers_dict = {
+            "IF/ID.IR": {"value": '0',
+                         'hex_length': 8},
+            "IF/ID.NPC": {"value": '0',
+                         'hex_length': 4},
+            "PC": {"value": '0',
+                         'hex_length': 4},
+            "ID/EX.A": {"value": '0',
+                         'hex_length': 8},
+            "ID/EX.B": {"value": '0',
+                         'hex_length': 8},
+            "ID/EX.IMM": {"value": '0',
+                         'hex_length': 3},
+            "ID/EX.IR": {"value": '0',
+                         'hex_length': 8},
+            "ID/EX.NPC": {"value": '0',
+                         'hex_length': 4},
+            "EX/MEM.ALUOUTPUT": {"value": '0',
+                         'hex_length': 8},
+            "EX/MEM.COND": {"value": '0',
+                         'hex_length': 1},
+            "EX/MEM.IR": {"value": '0',
+                         'hex_length': 8},
+            "EX/MEM.B": {"value": '0',
+                         'hex_length': 8},
+            "MEM/WB.LMD": {"value": '0',
+                         'hex_length': 8},
+            "MEM/WB.IR": {"value": '0',
+                         'hex_length': 8},
+            "MEM/WB.ALUOUTPUT": {"value": '0',
+                         'hex_length': 8},
+            "MEM/MEMORY AFFECTED": {"value": '0',
+                         'hex_length': 4},
+            "MEM/MEMORY VALUE": {"value": '0',
+                         'hex_length': 8},
+            "WB/REGISTER AFFECTED": {"value": '0',
+                         'hex_length': 2},
+            "WB/REGISTER VALUE": {"value": '0',
+                         'hex_length': 8}
+        }
+        self.registers_dict = registers_dict
+
+        self.data_segment_dict = {
+        }
+
+        self.pipeline_map_df = pd.DataFrame()
+        self.old_pipeline_map_df = pd.DataFrame()
+        self.current_pipeline_instructions = []
+        self.commands_dict = commands_dict
+        self.reserved_list = reserved_list
+        self.variables = {}
+        self.jump_instructions = {}
+        self.current_data_segment = None
+        self.current_text_segment = None
+        self.binary_table_df = pd.DataFrame()
+
+        self.is_line_by_line = None
+        self.line_button = None
+        self.line_incrementer = None
+
+        self.initialize_data_segment(addresses_to_load_dict)
+
+        # self.repopulate_register_ui()
+        # self.repopulate_data_segment_ui()
+        # self.repopulate_internal_register_ui()
+        # self.repopulate_text_segment_ui()
+        # self.repopulate_labels_ui()
+
+
+        self.pipeline_map_table.set_sheet_data(data = [[]],
+               reset_col_positions = True,
+               reset_row_positions = True,
+               redraw = True,
+               verify = False,
+               reset_highlights = False)
+
+        self.pipeline_map_table.headers(newheaders=[], index=None)
+
+        self.data_segment_table.set_sheet_data(data = [[]],
+               reset_col_positions = True,
+               reset_row_positions = True,
+               redraw = True,
+               verify = False,
+               reset_highlights = False)
+
+        self.internal_registers_table.set_sheet_data(data = [[]],
+               reset_col_positions = True,
+               reset_row_positions = True,
+               redraw = True,
+               verify = False,
+               reset_highlights = False)
+
+        self.text_segment_table.set_sheet_data(data = [[]],
+               reset_col_positions = True,
+               reset_row_positions = True,
+               redraw = True,
+               verify = False,
+               reset_highlights = False)
+
+        self.labels_table.set_sheet_data(data = [[]],
+               reset_col_positions = True,
+               reset_row_positions = True,
+               redraw = True,
+               verify = False,
+               reset_highlights = False)
+
     def repopulate_register_ui(self):
         
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
@@ -239,7 +353,7 @@ class Main(tk.Frame):
         
         for name, value in self.variables.items():
             address = value['address']
-            list_version_of_labels_dict += [[name, "0x" + "{0:0>4X}".format(int(address, 2))]]
+            list_version_of_labels_dict += [["0x" + "{0:0>4X}".format(int(address, 2))]]
             index_labels += [name]
         
         self.labels_table.set_sheet_data(data=list_version_of_labels_dict,
@@ -1157,6 +1271,10 @@ class Main(tk.Frame):
     
     # Gets the string from the edit text box
     def evaluate(self):
+
+        # reset
+        self.reset_data()
+
         #Get lines from text field
         string_to_eval = self.edit_text.get("1.0", "end")
         list_of_commands = string_to_eval.splitlines()

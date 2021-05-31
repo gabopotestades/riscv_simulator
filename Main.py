@@ -304,11 +304,18 @@ class Main(tk.Frame):
         if self.is_line_by_line is None:
             self.is_line_by_line = True
             self.execute()
-        self.line_incrementer.set(1)
-    
+        elif self.is_line_by_line is True:
+            self.line_incrementer.set(1)
+        else:
+            pass
+
+
     def execute_all(self):
-        self.is_line_by_line = False
-        self.execute()
+        if self.is_line_by_line is None:
+            self.is_line_by_line = False
+            self.execute()
+        else:
+            pass
     
     def wait_line_by_line(self, cycle_number, instruction):
 

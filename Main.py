@@ -763,12 +763,39 @@ class Main(tk.Frame):
                     value = bin(int(value, 16))
                 else:
                     value = bin(int(value))
+                
                 if var_name in self.variables.keys(): return False
                 self.variables[var_name] = {}
+
                 # Get current address to place variable
                 address = self.current_data_segment
+
                 # Increment by 4 the current address and pad with zeroes until 32 bits
                 self.current_data_segment = format(int(address, 2) + int ('100', 2), '#014b')
+
+
+                # Parse memory and value
+                affected_memory = int(address, 2)
+                value_to_store = int(value, 2)
+                first_affected_memory_in_hex = "{0:0>8X}".format(affected_memory)
+                second_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('1', 2)))
+                third_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('10', 2)))
+                fourth_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('11', 2)))
+
+                # value to save to data segment
+                memory_value_in_hex = "{0:0>8X}".format(value_to_store)
+
+                # Split into 4, two hex digit strings
+                memory_value_splitted_into_four_two_hex_digits = [(memory_value_in_hex[i:i+2]) for i in range(0, len(memory_value_in_hex), 2)]
+                self.data_segment_dict[first_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[3]
+                self.data_segment_dict[second_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[2]
+                self.data_segment_dict[third_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[1]
+                self.data_segment_dict[fourth_affected_memory_in_hex] = memory_value_splitted_into_four_two_hex_digits[0]
+
+
+                print(f'Address To Store: {affected_memory}, Value: {value_to_store}')
+
+                # self.data_segment_dict[address_to_store]['value'] = value
                 self.variables[var_name]['value'] = value
                 self.variables[var_name]['address'] = address
                 return True
@@ -1232,10 +1259,11 @@ class Main(tk.Frame):
             self.generate_pipeline_map(True, None, 1)
         self.repopulate_labels_ui()
         self.repopulate_text_segment_ui()
+        self.repopulate_data_segment_ui()
     
     def execute(self, cycle_number = 1):
         
-        # self.print_formatted_table()
+        self.print_formatted_table()
 
         def represents_int(s):
             try:
@@ -1533,7 +1561,7 @@ class Main(tk.Frame):
 
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
 
-                    # if six_to_zero == SW_OPCODE:
+                    # if six_to_zero == LW_OPCODE:
                     #     print('*' * 100)
                     #     print(f'Register A: {register_a}')
                     #     print(f'Register B: {register_b}')
@@ -1666,8 +1694,12 @@ class Main(tk.Frame):
                     # print(f'Register to update: {register_to_update}')
                     # print(f'LMD data in binary: {data_to_loaded_to_lmd}')
 
+                    if register_to_update == 'x0':
+                        data_to_loaded_to_lmd = '0'
+
                     self.internal_registers_dict['MEM/WB.LMD']['value'] = data_to_loaded_to_lmd
                     self.registers_dict[register_to_update]['value'] = data_to_loaded_to_lmd
+
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"ALUOUTPUT: {self.internal_registers_dict['MEM/WB.ALUOUTPUT']['value']}")
@@ -1675,14 +1707,17 @@ class Main(tk.Frame):
                     print(f"MEMORY AFFECTED: {self.internal_registers_dict['MEM/MEMORY AFFECTED']['value']}")
                     print(f"MEMORY VALUE: {self.internal_registers_dict['MEM/MEMORY VALUE']['value']}")
                     print('=' * 100)
+                
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
                 # print(pc_row)
                 self.wait_line_by_line(cycle_number, pc_row['address'][0])
             
             elif cycle_instruction == 'WB':
+                
                 six_to_zero = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][7:12][::-1]
+                
                 if six_to_zero in [LW_OPCODE,  ALU_ALU_OPCODE, ALU_IMM_OPCODE] :
                     if six_to_zero == LW_OPCODE:
                         self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
@@ -1698,8 +1733,10 @@ class Main(tk.Frame):
                 else:
                     self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
+                
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
+                
                 # print(f'Cycle number: {cycle_number}, Max: {cycle_inside_pipeline_instructions}')
                 if cycle_number == cycle_inside_pipeline_instructions - 1:
                     self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
@@ -1708,6 +1745,7 @@ class Main(tk.Frame):
                 # print(f"waiting...{cycle_number}")
                 # self.line_button.wait_variable(self.line_incrementer)
                 # print("done...")
+        
         # print(self.pipeline_map_df)
 
 if __name__ == "__main__":
@@ -1925,13 +1963,13 @@ addi x0, x0, 0
 # RISC-V pipeline test template(III) - memory test 2/pipeline map
     sample_input.append("""
 .data
-var1 .word 0x0a
-var2 .word 0x0b
-var3 .word 0x0c
+var1: .word 0x0a
+var2: .word 0x0b
+var3: .word 0x0c
 .text
 main:
 lw x11, var1(x0)
-lw x12, var2(x0
+lw x12, var2(x0)
 add x13, x11, x12
 sw x13, var3(x0)
 FIN:
@@ -1941,16 +1979,16 @@ addi x0, x0, 0
 # RISC-V pipeline test template(IV) - pipeline map
     sample_input.append("""
 .data
-var1 .word 0x0a
-var2 .word 0x0b
-var3 .word 0x0c
+var1: .word 0x0a
+var2: .word 0x0b
+var3: .word 0x0c
 
 lw x6, var1(x0)
 lw x7, var2(x0)
 BLT x6, x7, L1
 add x8, x6, x7
 and x9, x6, x7
-or x10 x6, x7
+or x10, x6, x7
 xor x11, x6, x7
 BEQ x0, x0, L2
 L1: 
@@ -1995,7 +2033,7 @@ sw x14, 0x104(x0)
 
     # endregion Declarables
 
-    testing_scenario = 2
+    testing_scenario = 3
 
     if testing_scenario == 2:
 

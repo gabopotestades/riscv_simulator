@@ -1485,13 +1485,18 @@ class Main(tk.Frame):
             self.print_jump_intructions()
             print('*' * 100)
 
+
+        stall_cycle = None
+
         # Iterate through each cycle instruction in the pipeline map
         for cycle_instruction in self.current_pipeline_instructions:
 
             self.repopulate_internal_register_ui()
 
             if cycle_instruction == '*':
+                stall_cycle = cycle_number
                 continue
+
             elif represents_int(cycle_instruction):
 
                 # Attempt to fix highlighting
@@ -1502,9 +1507,15 @@ class Main(tk.Frame):
                         and pc_row is not None \
                         and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
 
-                    print(f"IN REPRESENTS INT @ cycle number: {cycle_number}")
-                    print(pc_row['address'][0])
-                    self.wait_line_by_line(cycle_number, pc_row['address'][0])
+                    if stall_cycle is not None:
+                        if stall_cycle + 1 == cycle_number or stall_cycle == cycle_number:
+                            # and stall_cycle + 2 > cycle_number
+                            self.wait_line_by_line(cycle_number, pc_row['address'][0])
+                        elif stall_cycle + 2 == cycle_number:
+                            stall_cycle = None
+
+                    elif stall_cycle is None:
+                        self.wait_line_by_line(cycle_number, pc_row['address'][0])
 
 
 
@@ -2245,7 +2256,7 @@ sw x14, 0x104(x0)
 
     # endregion Declarables
 
-    testing_scenario = 2
+    testing_scenario = 1
 
     if testing_scenario == 2:
 

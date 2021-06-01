@@ -1510,7 +1510,6 @@ class Main(tk.Frame):
         # print(self.current_pipeline_instructions)
 
         integer_only_current_pipeline_instructions = [e for e in self.current_pipeline_instructions if isinstance(e, int)]
-
         address_to_branch = ''
         check_a_cycle = False
         self.will_jump = False

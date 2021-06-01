@@ -23,6 +23,13 @@ ALU_IMM_OPCODE = '0010011'
 # Address Limits
 DATA_SEGMENT_LIMIT = '11111111100'
 
+first_col = 0
+second_col = 1
+third_col = 2
+fourth_col = 3
+fifth_col = 4
+
+
 class Main(tk.Frame):
 
     # Initialize the screen
@@ -41,13 +48,13 @@ class Main(tk.Frame):
         self.line_counter = 1
         self.edit_text = None
         self.terminal_text = None
-
+        self.will_jump = False
         self.internal_registers_dict = {
             "IF/ID.IR": {"value": '0',
                          'hex_length': 8},
             "IF/ID.NPC": {"value": '0',
                          'hex_length': 4},
-            "PC": {"value": '0',
+            "PC": {"value": '1000000000000',
                          'hex_length': 4},
             "ID/EX.A": {"value": '0',
                          'hex_length': 8},
@@ -125,13 +132,14 @@ class Main(tk.Frame):
         self.parsing_passed = True
         self.runtime_passed = True
         self.line_counter = 1
+        self.will_jump = False
 
         self.internal_registers_dict = {
             "IF/ID.IR": {"value": '0',
                          'hex_length': 8},
             "IF/ID.NPC": {"value": '0',
                          'hex_length': 4},
-            "PC": {"value": '0',
+            "PC": {"value": '1000000000000',
                          'hex_length': 4},
             "ID/EX.A": {"value": '0',
                          'hex_length': 8},
@@ -183,8 +191,8 @@ class Main(tk.Frame):
         self.binary_table_df = pd.DataFrame()
 
         self.is_line_by_line = None
-        self.line_button = None
-        self.line_incrementer = None
+        self.line_incrementer = tk.IntVar()
+
 
         self.initialize_data_segment(addresses_to_load_dict)
 
@@ -194,15 +202,59 @@ class Main(tk.Frame):
         # self.repopulate_text_segment_ui()
         # self.repopulate_labels_ui()
 
+        self.pipeline_map_table.destroy()
 
-        self.pipeline_map_table.set_sheet_data(data = [[]],
-               reset_col_positions = True,
-               reset_row_positions = True,
-               redraw = True,
-               verify = False,
-               reset_highlights = False)
+        self.pipeline_map_table = Sheet(self.master,
+                                        show_row_index=True,
+                                        header_height="0",
+                                        row_index_width=100,
+                                        show_y_scrollbar=False,
+                                        show_x_scrollbar=False,
+                                        data=[])
+        self.pipeline_map_table.enable_bindings()
+        self.pipeline_map_table.change_theme(theme="dark blue")
+        self.pipeline_map_table.grid(row=6, column=fourth_col, columnspan=3, sticky="nswe")
 
-        self.pipeline_map_table.headers(newheaders=[], index=None)
+
+        self.labels_table.destroy()
+
+        self.labels_table = Sheet(self.master,
+                                  show_row_index=True,
+                                  header_height="0",
+                                  show_y_scrollbar=False,
+                                  row_index_width=50,
+                                  show_x_scrollbar=False,
+                                  data=[],
+                                  theme="dark blue")
+        self.labels_table.headers(newheaders=['VALUE'], index=None,
+                                  reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.labels_table.enable_bindings()
+        self.labels_table.grid(row=2, column=third_col, columnspan=1, sticky="nswe")
+
+
+        self.text_segment_table.destroy()
+
+        self.text_segment_table = Sheet(self.master,
+                                        show_row_index=True,
+                                        header_height="0",
+                                        row_index_width=50,
+                                        show_y_scrollbar=False,
+                                        show_x_scrollbar=False,
+                                        data=[[]], theme="dark blue")
+        self.text_segment_table.headers(newheaders=['CODE', 'BASIC'], index=None,
+                                        reset_col_positions=False, show_headers_if_not_sheet=True)
+        self.text_segment_table.enable_bindings()
+        self.text_segment_table.grid(row=2, column=fourth_col, columnspan=1, sticky="nswe")
+
+
+        self.registers_table.set_sheet_data(data=[[]],
+                                               reset_col_positions=True,
+                                               reset_row_positions=True,
+                                               redraw=True,
+                                               verify=False,
+                                               reset_highlights=False)
+        self.repopulate_register_ui()
+
 
         self.data_segment_table.set_sheet_data(data = [[]],
                reset_col_positions = True,
@@ -218,40 +270,28 @@ class Main(tk.Frame):
                verify = False,
                reset_highlights = False)
 
-        self.text_segment_table.set_sheet_data(data = [[]],
-               reset_col_positions = True,
-               reset_row_positions = True,
-               redraw = True,
-               verify = False,
-               reset_highlights = False)
 
-        self.labels_table.set_sheet_data(data = [[]],
-               reset_col_positions = True,
-               reset_row_positions = True,
-               redraw = True,
-               verify = False,
-               reset_highlights = False)
 
     def repopulate_register_ui(self):
-        
+
         # self.registers_table.set_row_data(0, values = (0 for i in range(35)))
         list_version_of_register_dict = []
         index_registers = []
-        
+
         for register, value in self.registers_dict.items():
             list_version_of_register_dict += [["{0:0>8X}".format(int(value['value'], 2))]]
             index_registers += [register]
-        
+
         self.registers_table.set_sheet_data(data=list_version_of_register_dict,
                        reset_col_positions=True,
                        reset_row_positions=True,
                        redraw=True,
                        verify=False,
                        reset_highlights=False)
-        
+
         self.registers_table.row_index(newindex=index_registers, reset_row_positions=False,
                                       show_index_if_not_sheet=True)
-    
+
     def repopulate_internal_register_ui(self):
 
         list_version_of_internal_registers_dict = []
@@ -263,20 +303,22 @@ class Main(tk.Frame):
             format_thingy = "{" + format_thingy + "}"
             in_hex = format_thingy.format(int(value['value'], 2))
             # Uncomment  to convert to proper hex value (and length)
-            # list_version_of_internal_registers_dict += [[in_hex]]
-            list_version_of_internal_registers_dict += [[value['value']]]
+            list_version_of_internal_registers_dict += [[in_hex]]
+
+            # list_version_of_internal_registers_dict += [[value['value']]]
+
             index_headers += [internal_register]
-        
+
         self.internal_registers_table.set_sheet_data(data=list_version_of_internal_registers_dict,
                                             reset_col_positions=True,
                                             reset_row_positions=True,
                                             redraw=True,
                                             verify=False,
                                             reset_highlights=False)
-        
+
         self.internal_registers_table.row_index(newindex=index_headers, reset_row_positions=False,
                                       show_index_if_not_sheet=True)
-    
+
     def repopulate_data_segment_ui(self):
         list_version_of_data_segment_dict = []
         counter = 0
@@ -287,9 +329,9 @@ class Main(tk.Frame):
         ui_address_list = []
 
         for address, value in self.data_segment_dict.items():
-            
+
             counter += 1
-            
+
             if counter == 1:
                 first = value
                 ui_address = address
@@ -306,22 +348,22 @@ class Main(tk.Frame):
                 fourth = "{0:0>2X}".format(int(fourth, 16))
                 list_version_of_data_segment_dict += [[f"{fourth} | {third} | {second} | {first}"]]
                 ui_address_list += [ui_address]
-        
+
         self.data_segment_table.set_sheet_data(data=list_version_of_data_segment_dict,
                                                      reset_col_positions=True,
                                                      reset_row_positions=True,
                                                      redraw=True,
                                                      verify=False,
                                                      reset_highlights=False)
-        
+
         self.data_segment_table.row_index(newindex=ui_address_list, reset_row_positions=False,
                                                 show_index_if_not_sheet=True)
-    
+
     def repopulate_text_segment_ui(self):
-        
+
         list_version_of_text_segment_dict = []
         index_addresses = []
-        
+
         for index, row in self.binary_table_df.iterrows():
             thirty_one_to_twenty_five = row['31-25'][2:].zfill(7)[::-1][0:8][::-1]
             twenty_four_to_twenty = row['24-20'][2:].zfill(5)[::-1][0:8][::-1]
@@ -332,74 +374,76 @@ class Main(tk.Frame):
             concatenated = thirty_one_to_twenty_five + twenty_four_to_twenty + nineteen_to_fifteen + fourteen_to_twelve + eleven_to_seven + six_to_zero
             list_version_of_text_segment_dict += [["0x" + "{0:0>8X}".format(int(concatenated, 2)), row['actual_command']]]
             index_addresses += ["0x" + "{0:0>4X}".format(int(row['address'], 2))]
-        
+
         self.text_segment_table.set_sheet_data(data=list_version_of_text_segment_dict,
                                                reset_col_positions=True,
                                                reset_row_positions=True,
                                                redraw=True,
                                                verify=False,
                                                reset_highlights=False)
-        
+
         self.text_segment_table.row_index(newindex=index_addresses, reset_row_positions=False,
                                       show_index_if_not_sheet=True)
-    
+
     def repopulate_labels_ui(self):
         list_version_of_labels_dict = []
         index_labels = []
-        
+
         for label, value in self.jump_instructions.items():
             list_version_of_labels_dict += [["0x" + "{0:0>4X}".format(int(value, 2))]]
             index_labels += [label]
-        
+
         for name, value in self.variables.items():
             address = value['address']
             list_version_of_labels_dict += [["0x" + "{0:0>4X}".format(int(address, 2))]]
             index_labels += [name]
-        
+
         self.labels_table.set_sheet_data(data=list_version_of_labels_dict,
                                                reset_col_positions=True,
                                                reset_row_positions=True,
                                                redraw=True,
                                                verify=False,
                                                reset_highlights=False)
-        
+
         self.labels_table.row_index(newindex=index_labels, reset_row_positions=False,
                                       show_index_if_not_sheet=True)
-    
+
     def repopulate_pipeline_ui(self, pipeline_map):
-        
+
         list_version_of_pipeline_df= []
         # for label, value in self.labels_dict.items():
         #     list_version_of_pipeline_df += [[label, value]]
         list_version_of_pipeline_df = []
-        
+
+        pipeline_map = pipeline_map.replace(np.nan, '', regex=True)
+
         for x in range(pipeline_map.shape[0]):
             temp_flattened_list = pipeline_map.loc[x, (pipeline_map.columns != 'opcode') & (pipeline_map.columns != 'instruction')].values.tolist()
             temp_flattened_list[0] = "0x" + "{0:0>4X}".format(int(temp_flattened_list[0], 2))
             list_version_of_pipeline_df += [temp_flattened_list]
-        
+
         list_of_clock_cycles = ['ADDRESS'] + [f'CYCLE {x}' for x in range(1, pipeline_map.shape[1] - 2)]
-        
+
         self.pipeline_map_table.headers(newheaders=list_of_clock_cycles, index=None,
                                      reset_col_positions=False, show_headers_if_not_sheet=True)
-        
+
         self.pipeline_map_table.set_sheet_data(data=list_version_of_pipeline_df,
                                                reset_col_positions=True,
                                                reset_row_positions=True,
                                                redraw=True,
                                                verify=False,
                                                reset_highlights=False)
-        
+
         if pipeline_map.shape[0] > 0:
             self.pipeline_map_table.row_index(newindex=pipeline_map['instruction'].tolist(),  reset_row_positions=False, show_index_if_not_sheet=True)
-        
+
         with open('pipelinemap.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             # writer.writerows(list_version_of_pipeline_df)
             writer.writerows(self.pipeline_map_table.get_sheet_data(get_index = True))
-    
+
     def initialize_data_segment(self, addresses_to_load_dict):
-        
+
         address = '0'
         for x in range (0, 512):
 
@@ -412,9 +456,9 @@ class Main(tk.Frame):
             self.data_segment_dict[address_key] = value
             address = hex(int(address, 2) + int ('1', 2)) # Increment by 4 current address
             address = bin(int(address,  16))
-    
+
     def execute_next_line(self):
-        
+
         if self.is_line_by_line is None:
             self.is_line_by_line = True
             self.execute()
@@ -430,11 +474,13 @@ class Main(tk.Frame):
             self.execute()
         else:
             pass
-    
+
     def wait_line_by_line(self, cycle_number, instruction):
 
         # print(instruction)
-        cycle_number = cycle_number + 1
+        # cycle_number = cycle_number + 1
+        cycle_number = cycle_number
+
         row_being_executed = self.old_pipeline_map_df.index[self.old_pipeline_map_df.address == instruction][0]
         # print(self.pipeline_map_df[f'Cycle {cycle_number}'])
         # row_being_executed = self.pipeline_map_df.filter(regex='^Cycle ', axis=1).loc[:cycle_number + 1].first_valid_index()
@@ -444,7 +490,8 @@ class Main(tk.Frame):
 
         ui_data = list(self.pipeline_map_table.get_column_data(cycle_number, return_copy=True))
 
-        # Get the first occurence of WB
+        step = 'WB'
+
         row_being_executed = [idx for idx, element in enumerate(ui_data) if element == 'WB'][0]
 
         # Remove all highlights
@@ -461,18 +508,14 @@ class Main(tk.Frame):
             self.line_button.wait_variable(self.line_incrementer)
 
         # print("done...")
-    
+
     def create_widgets(self):
         # self.master.grid_columnconfigure(0, weight=1)
         # self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1, uniform="group1")
         self.master.grid_columnconfigure(1, weight=1, uniform="group1")
         # self.master.grid_rowconfigure(0, weight=1)
-        first_col = 0
-        second_col = 1
-        third_col = 2
-        fourth_col = 3
-        fifth_col = 4
+
         assemble_button = Button(self.master, text="ASSEMBLE", command=self.evaluate, bg="green", fg="green", highlightbackground='#008000')
         # assemble_button.pack(fill="x")
         assemble_button.grid(row=0, column=first_col, columnspan=1, sticky='nswe')
@@ -492,7 +535,7 @@ class Main(tk.Frame):
         register_label.grid(row=1, column=second_col, columnspan=1, sticky='nswe')
         self.registers_table = Sheet(self.master,
                                      show_row_index=True,
-                                         row_index_width=20,
+                                         row_index_width=50,
                                      header_height="0",
                                      show_y_scrollbar=False,
                                      show_x_scrollbar=False,
@@ -559,7 +602,7 @@ class Main(tk.Frame):
         self.internal_registers_table = Sheet(self.master,
                                         show_row_index=True,
                                         header_height="1",
-                                        row_index_width=100,
+                                        row_index_width=200,
                                         column_width=200,
                                         show_y_scrollbar=False,
                                         show_x_scrollbar=False,
@@ -587,23 +630,23 @@ class Main(tk.Frame):
         self.repopulate_internal_register_ui()
         self.repopulate_data_segment_ui()
         self.repopulate_pipeline_ui(self.pipeline_map_df)
-    
+
 
     def print_registers(self):
         for key, value in self.registers_dict.items():
             var_value = value['value']
             print(f'Register: {key} | Value - {var_value}')
-    
+
     def print_jump_intructions(self):
         for key, value in self.jump_instructions.items():
             print(f'{key}: {value}')
-    
+
     def print_variables(self):
         for key, value in self.variables.items():
             var_value = value['value']
             address = value['address']
             print(f'{key}: Address - {address} | Value - {var_value}')
-    
+
     def print_formatted_table(self):
         print_df = self.binary_table_df.copy()
         print_df['address'] = print_df['address'].apply(lambda x: x[2:].zfill(16))
@@ -613,11 +656,11 @@ class Main(tk.Frame):
         print_df['14-12']   = print_df['14-12'].apply(lambda x: x[2:].zfill(3)[::-1][0:3][::-1])
         print_df['11-7']    = print_df['11-7'].apply(lambda x: x[2:].zfill(5)[::-1][0:5][::-1])
         print_df['6-0']     = print_df['6-0'].apply(lambda x: x[2:].zfill(7)[::-1][0:7][::-1])
-        
+
         if not self.test:
             print_df.drop(['line_number', 'pending_jump', 'pending_variable'], axis='columns', inplace=True)
         print(print_df)
-    
+
     def print_in_terminal(self, inputStr):
         # Enabled the terminal to insert text and disable again to make it readonly
         if not self.test:
@@ -633,7 +676,7 @@ class Main(tk.Frame):
                 self.terminal_text.insert(INSERT, result)
             self.terminal_text.see("end")
             self.terminal_text.config(state="disabled")
-    
+
 
     # Get return row on parsing of matched line
     def parse_instruction(self, instruction, matched_string, actual_instruction, is_command):
@@ -884,7 +927,7 @@ class Main(tk.Frame):
                     value = bin(int(value, 16))
                 else:
                     value = bin(int(value))
-                
+
                 if var_name in self.variables.keys(): return False
                 self.variables[var_name] = {}
 
@@ -936,7 +979,7 @@ class Main(tk.Frame):
                 # Commented out, jump doesn't need to be added as a intruction
                 # self.current_text_segment = bin(int(address, 2) + int ('100', 2)) # Increment by 4 the current address
                 return True
-    
+
     # Search if pending jumps are declared
     def populate_pending_jumps(self):
         if self.test:
@@ -1005,7 +1048,7 @@ class Main(tk.Frame):
                     print("#" * 100)
                     print("END UPDATE FUNCTION")
                     print("#" * 100)
-    
+
     # Search if pending variables are declared
     def populate_pending_variables(self):
         if self.test:
@@ -1067,7 +1110,7 @@ class Main(tk.Frame):
                     print("#" * 100)
                     print("END UPDATE VARIABLE")
                     print("#" * 100)
-    
+
     # After parsing, generate a rough draft of the pipeline map
     def generate_pipeline_map(self, is_initial, address_to_branch, starting_cycle_number):
         #
@@ -1268,7 +1311,7 @@ class Main(tk.Frame):
             self.repopulate_pipeline_ui(pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how='left',
                                                 left_on=INITIAL_PIPELINE_COLUMNS, right_on=INITIAL_PIPELINE_COLUMNS).replace(np.nan, '', regex=True))
             self.execute(cycle_counter)
-    
+
     # Gets the string from the edit text box
     def evaluate(self):
 
@@ -1385,10 +1428,9 @@ class Main(tk.Frame):
         self.repopulate_labels_ui()
         self.repopulate_text_segment_ui()
         self.repopulate_data_segment_ui()
-    
+        self.repopulate_internal_register_ui()
+
     def execute(self, cycle_number = 1):
-        
-        self.print_formatted_table()
 
         def represents_int(s):
             try:
@@ -1396,11 +1438,11 @@ class Main(tk.Frame):
                 return True
             except ValueError:
                 return False
-        
+
         def twos_comp(n, bits):
             s = bin(n & int("1"*bits, 2))[2:]
             return ("{0:0>%s}" % (bits)).format(s)
-        
+
         def to_signed_integer(integer, bit_size = 32):
             unsigned = integer % 2**bit_size
             if unsigned >= 2**(bit_size-1):
@@ -1408,22 +1450,22 @@ class Main(tk.Frame):
             else:
                 signed = unsigned
             return signed
-        
+
         # Add pipeline cycle instructions to list to be executed
         self.current_pipeline_instructions = []
         cycle_inside_pipeline_instructions = cycle_number
-        
+
         for column in self.pipeline_map_df.columns[3:]:
             self.current_pipeline_instructions.append(cycle_inside_pipeline_instructions)
             cycle_inside_pipeline_instructions += 1
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
-        
+
         # print('Instructions List:')
         # print(self.current_pipeline_instructions)
         address_to_branch = ''
         check_a_cycle = False
-        will_jump = False
+        self.will_jump = False
         if_instruction = None
         id_instruction = None
         if_branch = None
@@ -1435,20 +1477,20 @@ class Main(tk.Frame):
             print('Jump Instructions: ')
             self.print_jump_intructions()
             print('*' * 100)
-        
+
         # Iterate through each cycle instruction in the pipeline map
         for cycle_instruction in self.current_pipeline_instructions:
-            
+
             self.repopulate_internal_register_ui()
-            
+
             if cycle_instruction == '*':
                 continue
             elif represents_int(cycle_instruction):
                 cycle_number = cycle_instruction
                 continue
-            
+
             if cycle_instruction == 'IF':
-                
+
                 pc_row = self.binary_table_df[(self.binary_table_df['address'] == self.internal_registers_dict['PC']['value'])].reset_index(drop=True)
                 if_instruction = pc_row['instruction'][0]
                 if_branch = pc_row['pending_jump'][0]
@@ -1470,15 +1512,15 @@ class Main(tk.Frame):
                 # else:
                 #     self.internal_registers_dict['PC']['value'] =  format(int(pc_row['address'][0], 2) + int ('100', 2), '#014b') # Increment by 4
                 #     self.internal_registers_dict['IF/ID.NPC']['value'] =  self.internal_registers_dict['PC']['value']
-                
+
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"IR: {self.internal_registers_dict['IF/ID.IR']['value']}")
                     print(f"PC: {self.internal_registers_dict['PC']['value']}")
                     print('=' * 100)
-            
+
             elif cycle_instruction == 'ID':
-                
+
                 # Fix
                 id_branch = if_branch
                 id_instruction = if_instruction
@@ -1505,21 +1547,21 @@ class Main(tk.Frame):
                 self.internal_registers_dict['ID/EX.IR']['value'] = self.internal_registers_dict['IF/ID.IR']['value']
 
                 if six_to_zero == BRANCH_OPCODE: # branch
-                    
+
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five[0] + eleven_to_seven[4] + thirty_one_to_twenty_five[1:] + eleven_to_seven[0:4]
-                
+
                 elif six_to_zero == SW_OPCODE: # sw
-                    
+
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + eleven_to_seven
 
                     # print(f'SW Imme: {thirty_one_to_twenty_five + eleven_to_seven}')
-                
+
                 else: # alu instruction or lw
-                    
+
                     self.internal_registers_dict['ID/EX.IMM']['value'] = thirty_one_to_twenty_five + twenty_four_to_twenty
-                    
+
                     # print(f'Instruction: {id_instruction}, Value: {thirty_one_to_twenty_five + twenty_four_to_twenty}')
-                
+
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"A: {self.internal_registers_dict['ID/EX.A']['value']}")
@@ -1528,7 +1570,7 @@ class Main(tk.Frame):
                     # print(f"IR: {self.internal_registers_dict['ID/EX.IR']['value']}")
                     print(f"IMM: {self.internal_registers_dict['ID/EX.IMM']['value']}")
                     print('=' * 100)
-            
+
             elif cycle_instruction == 'EX':
 
                 self.internal_registers_dict['EX/MEM.IR']['value'] = self.internal_registers_dict['ID/EX.IR']['value']
@@ -1540,20 +1582,20 @@ class Main(tk.Frame):
                 twenty_four_to_twenty = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][20:25][::-1] # Fix
                 thirty_one_to_twenty_five = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][25:32][::-1]
                 result = 0
-            
+
                 register_a = 'x' + str(int(nineteen_to_fifteen, 2))
                 register_b = 'x' + str(int(twenty_four_to_twenty, 2))
                 register_a = self.registers_dict[register_a]['value'] # in binary
                 register_b = self.registers_dict[register_b]['value'] # in binary
                 register_a_in_binary = register_a
                 register_b_in_binary = register_b
-     
+
                 # Convert to two's complement
                 register_a = int(register_a, 2)
                 register_a = to_signed_integer(register_a, 32)
                 register_b = int(register_b, 2)
                 register_b = to_signed_integer(register_b, 32)
-                
+
                 if six_to_zero == ALU_ALU_OPCODE:
 
                     if id_instruction == 'add':
@@ -1601,7 +1643,7 @@ class Main(tk.Frame):
                     result = twos_comp(result, 32)
                     self.registers_dict[rd]['value'] = result # forwarding
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = result
-                    
+
                     # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
                     # print(f'Register A: {register_a}')
                     # print(f'Register B: {register_b}')
@@ -1660,28 +1702,28 @@ class Main(tk.Frame):
                     # print(f"rd: {rd}, value: {self.registers_dict[rd]['value']}")
                     # print(f'Register A: {register_a}')
                     # print(f'Immediate: {imme}')
-                
+
                 elif six_to_zero == BRANCH_OPCODE:
                     cond = '0'
                     if id_instruction == 'beq' and register_a == register_b:
                         cond = '1'
-                        will_jump = True
+                        self.will_jump = True
                     elif id_instruction == 'bne' and register_a != register_b:
                         cond = '1'
-                        will_jump = True
+                        self.will_jump = True
                     elif id_instruction == 'blt' and register_a < register_b:
                         cond = '1'
-                        will_jump = True
+                        self.will_jump = True
                     elif id_instruction == 'bge' and register_a >= register_b:
                         cond = '1'
-                        will_jump = True
+                        self.will_jump = True
                     # print(f'Instruction {id_instruction}')
                     # print(f'Register A: {register_a}')
                     # print(f'Register B: {register_b}')
                     self.internal_registers_dict['EX/MEM.COND']['value'] = cond
                     address_to_branch = self.jump_instructions[id_branch]
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(int(address_to_branch, 2), 32)
-                
+
                 elif six_to_zero in [SW_OPCODE, LW_OPCODE]:
 
                     immediate_in_binary = self.internal_registers_dict['ID/EX.IMM']['value']
@@ -1691,27 +1733,27 @@ class Main(tk.Frame):
                     #     print(f'Register A: {register_a}')
                     #     print(f'Register B: {register_b}')
                     #     print(f'Immediate: {immediate_in_binary}')
-                        
+
                     immediate_in_binary = int(immediate_in_binary, 2)
                     immediate_in_binary = to_signed_integer(immediate_in_binary, 12)
                     self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value'] = twos_comp(register_a + immediate_in_binary, 32)
-                
+
                 if check_a_cycle:
                     print(f"Cycle: {cycle_instruction}")
                     print(f"COND: {self.internal_registers_dict['EX/MEM.COND']['value']}")
                     print(f"ALUOUTPUT: {self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']}")
                     print('=' * 100)
-            
+
             elif cycle_instruction == 'MEM':
-                
+
                 # Drop the data in succeeding columns then branch
-                if will_jump:
+                if self.will_jump:
                     # if not check_a_cycle:
                     #     print(f"Cycle: {cycle_instruction}")
                     #     print(f"New PC for New Pipeline: {address_to_branch}")
                     #     print('*' * 100)
                     #     address_to_branch = ''
-                    will_jump = False
+                    self.will_jump = False
                     cycles_to_be_dropped = cycle_number + 1
                     # pipeline_columns_count = int(self.pipeline_map_df.columns[-1].replace('Cycle' , '')) + 1 # len(self.pipeline_map_df.columns) - 2
                     self.internal_registers_dict['PC']['value'] = address_to_branch
@@ -1733,7 +1775,7 @@ class Main(tk.Frame):
                     # self.repopulate_pipeline_ui(self.old_pipeline_map_df)
                     # print(self.old_pipeline_map_df)
                     return
-                
+
                 six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][7:12][::-1]
                 self.internal_registers_dict['MEM/WB.IR']['value'] = self.internal_registers_dict['EX/MEM.IR']['value']
@@ -1741,19 +1783,19 @@ class Main(tk.Frame):
                 self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = '0'
                 self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = '0'
                 self.internal_registers_dict['MEM/WB.LMD']['value'] = '0'
-                
+
                 if six_to_zero == SW_OPCODE:
-                    
+
                     self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'] = self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']
                     self.internal_registers_dict['MEM/MEMORY VALUE']['value'] = self.internal_registers_dict['EX/MEM.B']['value']
                     affected_memory = int(self.internal_registers_dict['MEM/MEMORY AFFECTED']['value'], 2)
-                    
+
                     if affected_memory > int(DATA_SEGMENT_LIMIT, 2):
                         error_message = f'Runtime Error, Line {(cycle_number - 4)}: Address is greater than the data segment limit.'
                         self.print_in_terminal(error_message)
                         self.runtime_passed = False
                         break
-                    
+
                     first_affected_memory_in_hex = "{0:0>8X}".format(affected_memory)
                     second_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('1', 2)))
                     third_affected_memory_in_hex = "{0:0>8X}".format((affected_memory + int('10', 2)))
@@ -1799,7 +1841,7 @@ class Main(tk.Frame):
                     third_data = self.data_segment_dict[third_address_of_data]
                     forth_data = self.data_segment_dict[forth_address_of_data]
                     data_to_loaded_to_lmd = bin(int(forth_data + third_data + second_data + first_data, 16))[2:]
-                    
+
 
                     # print(f"ALU Output: {self.internal_registers_dict['EX/MEM.ALUOUTPUT']['value']}")
                     # print(f'Address of data in memory: {address_of_data_from_memory}' )
@@ -1832,17 +1874,17 @@ class Main(tk.Frame):
                     print(f"MEMORY AFFECTED: {self.internal_registers_dict['MEM/MEMORY AFFECTED']['value']}")
                     print(f"MEMORY VALUE: {self.internal_registers_dict['MEM/MEMORY VALUE']['value']}")
                     print('=' * 100)
-                
+
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
                 # print(pc_row)
-                self.wait_line_by_line(cycle_number, pc_row['address'][0])
-            
+                # self.wait_line_by_line(cycle_number, pc_row['address'][0])
+
             elif cycle_instruction == 'WB':
-                
+
                 six_to_zero = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][7:12][::-1]
-                
+
                 if six_to_zero in [LW_OPCODE,  ALU_ALU_OPCODE, ALU_IMM_OPCODE] :
                     if six_to_zero == LW_OPCODE:
                         self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = eleven_to_seven
@@ -1858,10 +1900,10 @@ class Main(tk.Frame):
                 else:
                     self.internal_registers_dict['WB/REGISTER AFFECTED']['value'] = '0'
                     self.internal_registers_dict['WB/REGISTER VALUE']['value'] = '0'
-                
+
                 self.repopulate_data_segment_ui()
                 self.repopulate_register_ui()
-                
+
                 # print(f'Cycle number: {cycle_number}, Max: {cycle_inside_pipeline_instructions}')
                 if cycle_number == cycle_inside_pipeline_instructions - 1:
                     self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
@@ -1870,7 +1912,9 @@ class Main(tk.Frame):
                 # print(f"waiting...{cycle_number}")
                 # self.line_button.wait_variable(self.line_incrementer)
                 # print("done...")
-        
+                self.wait_line_by_line(cycle_number, pc_row['address'][0])
+
+
         # print(self.pipeline_map_df)
 
 if __name__ == "__main__":
@@ -1886,14 +1930,14 @@ if __name__ == "__main__":
         # jump declaration
         "jump": r'(?!^x(0|0?[1-9]|[12][0-9]|3[01]):$)^([a-z_][\w]*)[\s]*:$'
     }
-    
+
     # Old regex for load store
     # regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([\d]*)\(x(0|0?[1-9]|[12][0-9]|3[01])\)$"
     regex_store_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*((?!x(0|0?[1-9]|[12][0-9]|3[01]))[a-z_][\w]+|[-+]?0|[-+]?[1-9][0-9]*|0x[a-f0-9]+)?(\(x(0|0?[1-9]|[12][0-9]|3[01])\))?$"
     regex_integer_computation = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])$"
     regex_integer_computation_immediate = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([-+]?0|[-+]?[1-9][0-9]*|0x[a-f0-9]+)$"
     regex_branching_instruction = r"[\s]+x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*x(0|0?[1-9]|[12][0-9]|3[01])[\s]*,[\s]*([a-z_][\w]*)$"
-    
+
     commands_dict = {
         # Register to Memory
         "lw": {
@@ -2108,6 +2152,7 @@ var1: .word 0x0a
 var2: .word 0x0b
 var3: .word 0x0c
 
+.text
 lw x6, var1(x0)
 lw x7, var2(x0)
 BLT x6, x7, L1
@@ -2117,7 +2162,7 @@ or x10, x6, x7
 xor x11, x6, x7
 BEQ x0, x0, L2
 L1: 
-ADDI x8, x7, 008
+ADDI x8, x7, 0x008
 ANDI x9, x7, 0x00C
 ORI x10, x7, 0x0FF
 XORI x11, x7, 0x000
@@ -2140,7 +2185,7 @@ slt x15, x5, x6
 sw x14, 0x104(x0)
 """)
 
-# RISC-V pipeline test template(VI) -branch internal register 
+# RISC-V pipeline test template(VI) -branch internal register
 # .data
 # intialize addr 0x100 to word data 0x00000044
 # intialize addr 0x104 to word data 0x00000077
@@ -2158,7 +2203,7 @@ sw x14, 0x104(x0)
 
     # endregion Declarables
 
-    testing_scenario = 3
+    testing_scenario = 6
 
     if testing_scenario == 2:
 
@@ -2170,9 +2215,9 @@ sw x14, 0x104(x0)
 
         # load address 0x108 with word data 0x0c
         addresses_to_load_dict['00000108'] = 'C'
- 
+
     elif testing_scenario == 5:
-        
+
         # intialize addr 0x100 to word data 0x00000088
         addresses_to_load_dict['00000100'] = '00000088'
 

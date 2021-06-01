@@ -3,7 +3,7 @@ import re
 import sys
 import csv
 import tkinter as tk
-from tkinter import Label, Button, Text, CENTER, INSERT, END
+from tkinter import Label, Button, Text, CENTER, INSERT, END, Entry, messagebox
 from pandas.tseries.frequencies import to_offset
 from tksheet import Sheet
 import numpy as np
@@ -115,7 +115,8 @@ class Main(tk.Frame):
         self.is_line_by_line = None
         self.line_button = None
         self.line_incrementer = None
-
+        self.go_to_input_ui = None
+        self.go_to_variable = tk.StringVar()
         self.initialize_data_segment(addresses_to_load_dict)
         self.create_widgets()
 
@@ -126,6 +127,28 @@ class Main(tk.Frame):
         #     self.repopulate_pipeline_ui(self.old_pipeline_map_df)
             # print(self.old_pipeline_map_df)
             # self.print_registers()
+
+    def go_to(self):
+        address = str(self.go_to_variable.get())
+
+        data_segment_df = pd.DataFrame(self.data_segment_table.get_sheet_data(get_index=True), columns = ['address', 'value'])
+
+
+
+
+        index_to_go_to = data_segment_df[data_segment_df["address"] == address].index
+
+        if len(index_to_go_to) == 0:
+            # messagebox.showwarning("showinfo", f"Address {address} cannot be found")
+            pass
+        else:
+            index_to_go_to = index_to_go_to[0]
+            self.data_segment_table.see(row=index_to_go_to, check_cell_visibility=True)
+            self.data_segment_table.highlight_rows(rows=[index_to_go_to], bg='green', highlight_index=True, redraw=True)
+            self.data_segment_table.dehighlight_all()
+
+
+
 
     def reset_data(self):
 
@@ -233,6 +256,7 @@ class Main(tk.Frame):
         self.labels_table.enable_bindings()
         self.labels_table.grid(row=2, column=third_col, columnspan=1, sticky="nswe")
 
+        self.data_segment_table.dehighlight_all()
 
         self.text_segment_table.destroy()
 
@@ -478,6 +502,7 @@ class Main(tk.Frame):
             pass
 
     def wait_line_by_line(self, cycle_number, instruction):
+        self.print_formatted_table()
 
         # print(instruction)
         # cycle_number = cycle_number + 1
@@ -588,6 +613,12 @@ class Main(tk.Frame):
         self.data_segment_table.headers(newheaders=['VALUE'], index=None,
                                               reset_col_positions=False, show_headers_if_not_sheet=True)
         self.data_segment_table.grid(row=2, column=fifth_col, columnspan=1, sticky="nswe")
+
+        self.go_to_input_ui = Entry(self.master, textvariable = self.go_to_variable)
+        self.go_to_input_ui.grid(row=0, column=fourth_col, columnspan=1, sticky='nswe')
+        go_to_button = Button(self.master, text="GO TO", command=self.go_to, bg="gray", fg="violet", highlightbackground='#008000')
+        go_to_button.grid(row=0, column=fifth_col, columnspan=1, sticky='nswe')
+
         text_segment_label = Label(self.master, text="TEXT SEGMENT", background="#505050", foreground="white")
         text_segment_label.config(anchor=CENTER)
         text_segment_label.grid(row=1, column=fourth_col, columnspan=1, sticky='nswe')
@@ -2256,7 +2287,7 @@ sw x14, 0x104(x0)
 
     # endregion Declarables
 
-    testing_scenario = 1
+    testing_scenario = 5
 
     if testing_scenario == 2:
 

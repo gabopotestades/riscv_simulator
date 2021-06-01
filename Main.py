@@ -138,14 +138,19 @@ class Main(tk.Frame):
 
         index_to_go_to = data_segment_df[data_segment_df["address"] == address].index
 
-        if len(index_to_go_to) == 0:
+        if len(address) == 0:
+            self.go_to_variable.set("Go to")
+            self.go_to_input_ui.config({"background": "white"})
+        elif len(index_to_go_to) == 0:
             # messagebox.showwarning("showinfo", f"Address {address} cannot be found")
-            pass
+            self.go_to_input_ui.config({"background": "#9E1A1A"})
         else:
             index_to_go_to = index_to_go_to[0]
             self.data_segment_table.see(row=index_to_go_to, check_cell_visibility=True)
             self.data_segment_table.highlight_rows(rows=[index_to_go_to], bg='green', highlight_index=True, redraw=True)
             self.data_segment_table.dehighlight_all()
+            self.go_to_input_ui.config({"background": "lightgreen"})
+
 
 
 
@@ -158,6 +163,8 @@ class Main(tk.Frame):
         self.runtime_passed = True
         self.line_counter = 1
         self.will_jump = False
+        self.go_to_input_ui.config({"background": "white"})
+        self.go_to_variable.set("Go to")
 
         self.internal_registers_dict = {
             "IF/ID.IR": {"value": '0',
@@ -502,7 +509,7 @@ class Main(tk.Frame):
             pass
 
     def wait_line_by_line(self, cycle_number, instruction):
-        self.print_formatted_table()
+        # self.print_formatted_table()
 
         # print(instruction)
         # cycle_number = cycle_number + 1
@@ -618,6 +625,7 @@ class Main(tk.Frame):
         self.go_to_input_ui.grid(row=0, column=fourth_col, columnspan=1, sticky='nswe')
         go_to_button = Button(self.master, text="GO TO", command=self.go_to, bg="gray", fg="violet", highlightbackground='#008000')
         go_to_button.grid(row=0, column=fifth_col, columnspan=1, sticky='nswe')
+        self.go_to_variable.set("Go to")
 
         text_segment_label = Label(self.master, text="TEXT SEGMENT", background="#505050", foreground="white")
         text_segment_label.config(anchor=CENTER)
@@ -1442,7 +1450,7 @@ class Main(tk.Frame):
         if self.parsing_passed:
             if self.test:
                 self.print_in_terminal(results)
-            # self.print_formatted_table()
+            self.print_formatted_table()
             if not self.test:
                 self.print_in_terminal('Success in parsing.\n')
             # print('=' * 100)
@@ -1460,6 +1468,8 @@ class Main(tk.Frame):
         self.repopulate_text_segment_ui()
         self.repopulate_data_segment_ui()
         self.repopulate_internal_register_ui()
+
+
 
     def execute(self, cycle_number = 1):
 
@@ -1495,8 +1505,9 @@ class Main(tk.Frame):
         # Add buffer to last cycle
         self.current_pipeline_instructions.append(-99)
 
-        print('Instructions List:')
-        print(self.current_pipeline_instructions)
+        #
+        # print('Instructions List:')
+        # print(self.current_pipeline_instructions)
 
         integer_only_current_pipeline_instructions = [e for e in self.current_pipeline_instructions if isinstance(e, int)]
 
@@ -1996,7 +2007,6 @@ class Main(tk.Frame):
                 # print(f"waiting...{cycle_number}")
                 # self.line_button.wait_variable(self.line_incrementer)
                 # print("done...")
-
 
 
         # print(self.pipeline_map_df)

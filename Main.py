@@ -49,6 +49,8 @@ class Main(tk.Frame):
         self.edit_text = None
         self.terminal_text = None
         self.will_jump = False
+        self.execute_internal_counter = 0
+
         self.internal_registers_dict = {
             "IF/ID.IR": {"value": '0',
                          'hex_length': 8},
@@ -490,9 +492,13 @@ class Main(tk.Frame):
 
         ui_data = list(self.pipeline_map_table.get_column_data(cycle_number, return_copy=True))
 
-        step = 'WB'
+        # if self.will_jump == True:
+        #     step = ['IF']
+        # else:
+        #     step = ['WB']
 
-        row_being_executed = [idx for idx, element in enumerate(ui_data) if element == 'WB'][0]
+
+        row_being_executed = [idx for idx, element in enumerate(ui_data) if element != ""][0]
 
         # Remove all highlights
         self.pipeline_map_table.dehighlight_all()
@@ -1119,18 +1125,12 @@ class Main(tk.Frame):
             dropped_columns = ['Cycle ' + str(n) for n in range(starting_cycle_number, pipeline_columns_count)]
             # New parameters below
             # self.generate_pipeline_map(False, address_to_branch, int(dropped_columns[0].replace('Cycle ', '')) + 1)
-            print("Ingenerate pipeline map b4 merge")
-            print(dropped_columns)
-            print(self.old_pipeline_map_df)
-            print(self.pipeline_map_df)
+
             self.pipeline_map_df = self.pipeline_map_df.drop(dropped_columns, axis=1)
             self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how='left',
                                                 left_on=INITIAL_PIPELINE_COLUMNS, right_on=INITIAL_PIPELINE_COLUMNS)
             self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex=True)
-            print("Ingenerate pipeline map afte rmerge")
-            print(dropped_columns)
-            print(self.old_pipeline_map_df)
-            print(self.pipeline_map_df)
+
             # self.repopulate_pipeline_ui(self.temp_old_pipeline_map_df)
         # Reset pipeline map
         counter = 1
@@ -1461,8 +1461,14 @@ class Main(tk.Frame):
             for cell in self.pipeline_map_df[column]:
                 if cell != '': self.current_pipeline_instructions.append(cell)
 
-        # print('Instructions List:')
-        # print(self.current_pipeline_instructions)
+        # Add buffer to last cycle
+        self.current_pipeline_instructions.append(-99)
+
+        print('Instructions List:')
+        print(self.current_pipeline_instructions)
+
+        integer_only_current_pipeline_instructions = [e for e in self.current_pipeline_instructions if isinstance(e, int)]
+
         address_to_branch = ''
         check_a_cycle = False
         self.will_jump = False
@@ -1470,6 +1476,7 @@ class Main(tk.Frame):
         id_instruction = None
         if_branch = None
         id_branch = None
+        pc_row = None
 
         if check_a_cycle:
             self.print_formatted_table()
@@ -1486,10 +1493,30 @@ class Main(tk.Frame):
             if cycle_instruction == '*':
                 continue
             elif represents_int(cycle_instruction):
+
+                # Attempt to fix highlighting
+                # if cycle_number > 4 \
+                #         and pc_row is not None \
+                #         and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
+                if cycle_number > 4 \
+                        and pc_row is not None \
+                        and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
+
+                    print(f"IN REPRESENTS INT @ cycle number: {cycle_number}")
+                    print(pc_row['address'][0])
+                    self.wait_line_by_line(cycle_number, pc_row['address'][0])
+
+
+
+
+
                 cycle_number = cycle_instruction
                 continue
 
             if cycle_instruction == 'IF':
+
+
+                self.execute_internal_counter = 4
 
                 pc_row = self.binary_table_df[(self.binary_table_df['address'] == self.internal_registers_dict['PC']['value'])].reset_index(drop=True)
                 if_instruction = pc_row['instruction'][0]
@@ -1520,6 +1547,7 @@ class Main(tk.Frame):
                     print('=' * 100)
 
             elif cycle_instruction == 'ID':
+                self.execute_internal_counter -= 1
 
                 # Fix
                 id_branch = if_branch
@@ -1572,6 +1600,7 @@ class Main(tk.Frame):
                     print('=' * 100)
 
             elif cycle_instruction == 'EX':
+                self.execute_internal_counter -= 1
 
                 self.internal_registers_dict['EX/MEM.IR']['value'] = self.internal_registers_dict['ID/EX.IR']['value']
                 self.internal_registers_dict['EX/MEM.B']['value'] = self.internal_registers_dict['ID/EX.B']['value']
@@ -1745,15 +1774,17 @@ class Main(tk.Frame):
                     print('=' * 100)
 
             elif cycle_instruction == 'MEM':
+                self.execute_internal_counter -= 1
 
                 # Drop the data in succeeding columns then branch
                 if self.will_jump:
+                    self.will_jump = False
+
                     # if not check_a_cycle:
                     #     print(f"Cycle: {cycle_instruction}")
                     #     print(f"New PC for New Pipeline: {address_to_branch}")
                     #     print('*' * 100)
                     #     address_to_branch = ''
-                    self.will_jump = False
                     cycles_to_be_dropped = cycle_number + 1
                     # pipeline_columns_count = int(self.pipeline_map_df.columns[-1].replace('Cycle' , '')) + 1 # len(self.pipeline_map_df.columns) - 2
                     self.internal_registers_dict['PC']['value'] = address_to_branch
@@ -1767,6 +1798,12 @@ class Main(tk.Frame):
                     # self.pipeline_map_df = self.pipeline_map_df.drop(dropped_columns, axis = 1)
                     # self.old_pipeline_map_df = pd.merge(self.old_pipeline_map_df, self.pipeline_map_df, how = 'left', left_on = INITIAL_PIPELINE_COLUMNS, right_on = INITIAL_PIPELINE_COLUMNS)
                     # self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
+
+                    # Bandaid solution, did not deep dive
+                    print(f"IN MEM INT @ cycle number: {cycle_number}")
+                    self.wait_line_by_line(cycle_number, pc_row['address'][0])
+
+
                     self.generate_pipeline_map(False, address_to_branch, cycles_to_be_dropped)
                     # print(f'Register x3: {self.registers_dict["x3"]}')
                     # # Only temporary, for viewing
@@ -1774,6 +1811,10 @@ class Main(tk.Frame):
                     # self.old_pipeline_map_df = self.old_pipeline_map_df.replace(np.nan, '', regex = True)
                     # self.repopulate_pipeline_ui(self.old_pipeline_map_df)
                     # print(self.old_pipeline_map_df)
+
+
+
+
                     return
 
                 six_to_zero = self.internal_registers_dict['EX/MEM.IR']['value'][::-1][0:7][::-1]
@@ -1881,6 +1922,7 @@ class Main(tk.Frame):
                 # self.wait_line_by_line(cycle_number, pc_row['address'][0])
 
             elif cycle_instruction == 'WB':
+                self.execute_internal_counter -= 1
 
                 six_to_zero = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][0:7][::-1]
                 eleven_to_seven = self.internal_registers_dict['MEM/WB.IR']['value'][::-1][7:12][::-1]
@@ -1912,7 +1954,7 @@ class Main(tk.Frame):
                 # print(f"waiting...{cycle_number}")
                 # self.line_button.wait_variable(self.line_incrementer)
                 # print("done...")
-                self.wait_line_by_line(cycle_number, pc_row['address'][0])
+
 
 
         # print(self.pipeline_map_df)
@@ -2203,7 +2245,7 @@ sw x14, 0x104(x0)
 
     # endregion Declarables
 
-    testing_scenario = 6
+    testing_scenario = 2
 
     if testing_scenario == 2:
 

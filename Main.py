@@ -508,7 +508,7 @@ class Main(tk.Frame):
         else:
             pass
 
-    def wait_line_by_line(self, cycle_number, instruction):
+    def wait_line_by_line(self, cycle_number, instruction, cycle_instruction):
         # self.print_formatted_table()
 
         # print(instruction)
@@ -529,8 +529,9 @@ class Main(tk.Frame):
         # else:
         #     step = ['WB']
 
+        # row_being_executed = [idx for idx, element in enumerate(ui_data) if element != ""][0]
 
-        row_being_executed = [idx for idx, element in enumerate(ui_data) if element != ""][0]
+        row_being_executed = [idx for idx, element in enumerate(ui_data) if element == cycle_instruction][0]
 
         # Remove all highlights
         self.pipeline_map_table.dehighlight_all()
@@ -1531,8 +1532,11 @@ class Main(tk.Frame):
 
         # Iterate through each cycle instruction in the pipeline map
         for cycle_instruction in self.current_pipeline_instructions:
+            print(cycle_instruction)
+
 
             self.repopulate_internal_register_ui()
+
 
             if cycle_instruction == '*':
                 stall_cycle = cycle_number
@@ -1544,20 +1548,20 @@ class Main(tk.Frame):
                 # if cycle_number > 4 \
                 #         and pc_row is not None \
                 #         and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
-                if cycle_number > 4 \
-                        and pc_row is not None \
-                        and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
-
-                    if stall_cycle is not None:
-                        if stall_cycle + 1 == cycle_number or stall_cycle == cycle_number:
-                            # and stall_cycle + 2 > cycle_number
-                            self.wait_line_by_line(cycle_number, pc_row['address'][0])
-                        elif stall_cycle + 2 == cycle_number:
-                            stall_cycle = None
-
-                    elif stall_cycle is None:
-                        self.wait_line_by_line(cycle_number, pc_row['address'][0])
-
+                # if cycle_number > 4 \
+                #         and pc_row is not None \
+                #         and integer_only_current_pipeline_instructions.index(cycle_number) > 3:
+                #
+                #     if stall_cycle is not None:
+                #         if stall_cycle + 1 == cycle_number or stall_cycle == cycle_number:
+                #             # and stall_cycle + 2 > cycle_number
+                #             self.wait_line_by_line(cycle_number, pc_row['address'][0])
+                #         elif stall_cycle + 2 == cycle_number:
+                #             stall_cycle = None
+                #
+                #     elif stall_cycle is None:
+                #         self.wait_line_by_line(cycle_number, pc_row['address'][0])
+                #
 
 
 
@@ -1853,7 +1857,7 @@ class Main(tk.Frame):
 
                     # Bandaid solution, did not deep dive
                     print(f"IN MEM INT @ cycle number: {cycle_number}")
-                    self.wait_line_by_line(cycle_number, pc_row['address'][0])
+                    self.wait_line_by_line(cycle_number, pc_row['address'][0], cycle_instruction)
 
 
                     self.generate_pipeline_map(False, address_to_branch, cycles_to_be_dropped)
@@ -2006,6 +2010,11 @@ class Main(tk.Frame):
                 # print(f"waiting...{cycle_number}")
                 # self.line_button.wait_variable(self.line_incrementer)
                 # print("done...")
+
+            self.repopulate_internal_register_ui()
+            self.wait_line_by_line(cycle_number, pc_row['address'][0], cycle_instruction)
+
+
 
 
         # print(self.pipeline_map_df)
@@ -2295,8 +2304,8 @@ sw x14, 0x104(x0)
 """)
 
     # endregion Declarables
+    testing_scenario = 6
 
-    testing_scenario = 5
 
     if testing_scenario == 2:
 
